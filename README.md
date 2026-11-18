@@ -6,6 +6,8 @@ New trip opens a full-screen Tiptap editor with continuous writing, bold/italic/
 
 Run `npm run build` to produce the Worker at `dist/server/index.js`. Schema migrations are in `drizzle/`. The deployment requires the DB and BUCKET bindings declared in `.openai/hosting.json`.
 
+For a multi-day trip, enter a start and end date. Choose **＋ Dated section** to append a day, set its date, and write or add photos inside it. Existing text can stay above the dated sections. The trip appears once on Timeline under its start date.
+
 ## Browsing your journal
 
 Stories, Gallery and Timeline share the same search, year and tag filters. Search matches titles, destinations, story text and photo captions. Add comma-separated tags in the trip editor. Timeline shows trips newest first, with stories from the same date stacked under one milestone.

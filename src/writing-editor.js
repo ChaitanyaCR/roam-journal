@@ -1,10 +1,53 @@
-import { Editor } from "@tiptap/core";
+import { Editor, Node } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import FileHandler from "@tiptap/extension-file-handler";
 import Placeholder from "@tiptap/extension-placeholder";
 import { closeHistory } from "@tiptap/pm/history";
 import { normalizeDocument } from "../shared/story-document.mjs";
+
+// Dated sections belong at the document root and contain ordinary story blocks.
+const StoryDoc = Node.create({ name: "doc", topNode: true, content: "(block | daySection)+" });
+const DaySection = Node.create({
+  name: "daySection",
+  content: "block+",
+  defining: true,
+  addAttributes() { return { date: { default: "" } }; },
+  renderHTML({ node }) {
+    return ["section", { class: "story-day" }, ["h3", {}, node.attrs.date], ["div", {}, 0]];
+  },
+  addNodeView() {
+    return ({ node, getPos, editor }) => {
+      const dom = document.createElement("section");
+      dom.className = "story-day";
+      const label = document.createElement("label");
+      label.contentEditable = "false";
+      label.textContent = "Section date";
+      const input = document.createElement("input");
+      input.type = "date";
+      input.value = node.attrs.date;
+      label.append(input);
+      const contentDOM = document.createElement("div");
+      dom.append(label, contentDOM);
+      input.addEventListener("input", () => {
+        const pos = getPos();
+        if (editor.isEditable && typeof pos === "number") {
+          editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { date: input.value }));
+        }
+      });
+      return {
+        dom, contentDOM,
+        stopEvent: event => label.contains(event.target),
+        ignoreMutation: mutation => label.contains(mutation.target),
+        update(next) {
+          if (next.type !== node.type) return false;
+          if (input.value !== next.attrs.date) input.value = next.attrs.date;
+          return true;
+        },
+      };
+    };
+  },
+});
 
 const Photo = Image.extend({
   addAttributes() {
@@ -139,10 +182,10 @@ export function createWritingEditor({ element, trip, draft, onChange = () => {},
     element,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2] }, link: false, code: false, codeBlock: false,
+        document: false, heading: { levels: [2] }, link: false, code: false, codeBlock: false,
         blockquote: false, horizontalRule: false, orderedList: false, strike: false, underline: false,
       }),
-      Photo,
+      StoryDoc, DaySection, Photo,
       Placeholder.configure({ placeholder: "Start your story… Add a photo whenever words aren’t enough." }),
       FileHandler.configure({
         consumePasteEvent: true,
@@ -181,11 +224,13 @@ export function createWritingEditor({ element, trip, draft, onChange = () => {},
       }
       return { ...node, ...(node.content ? { content: node.content.map(serialize) } : {}) };
     }
-    return { document: { ...serialize(editor.getJSON()), version: 1 }, uploads, photoKeys };
+    const document = serialize(editor.getJSON());
+    document.version = document.content.some(node => node.type === "daySection") ? 2 : 1;
+    return { document, uploads, photoKeys };
   }
-  function submission() {
+  function submission(range) {
     const draft = snapshot();
-    return { ...draft, document: normalizeDocument(draft.document, draft.photoKeys.length) };
+    return { ...draft, document: normalizeDocument(draft.document, draft.photoKeys.length, range) };
   }
   return { editor, insertPhotos, snapshot, submission, photoCount: () => activePhotos().length };
 }

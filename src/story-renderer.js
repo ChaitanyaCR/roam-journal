@@ -1,5 +1,5 @@
 export function layoutStoryPhotos(container) {
-  for (const section of [container, ...container.querySelectorAll("li")]) {
+  for (const section of [container, ...container.querySelectorAll("li, .story-day > div")]) {
     let row;
     let blankLines = [];
     for (const block of [...section.children]) {
@@ -48,6 +48,16 @@ export function renderStory(document, photos) {
         text = wrapper;
       }
       return text;
+    }
+    if (node.type === "daySection") {
+      const section = window.document.createElement("section");
+      section.className = "story-day";
+      const heading = window.document.createElement("h3");
+      heading.textContent = node.attrs.date;
+      const body = window.document.createElement("div");
+      for (const child of node.content) body.append(render(child));
+      section.append(heading, body);
+      return section;
     }
     if (node.type === "image") {
       const figure = window.document.createElement("figure");

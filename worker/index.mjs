@@ -1,9 +1,9 @@
-import { normalizeDocument, documentText } from "../shared/story-document.mjs";
+import { normalizeDocument, documentText, validDate } from "../shared/story-document.mjs";
 
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 const MB = 1024 * 1024;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags, deleted_at";
+const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags, deleted_at, end_date";
 const photoLimit = "Choose up to 12 JPG, PNG, or WebP photos, up to 8 MB each and 28 MB total.";
 const formats = {
   "image/jpeg": b => b[0] === 255 && b[1] === 216 && b[2] === 255,
@@ -91,6 +91,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     }
   }
   const date = field("date");
+  let endDate = field("end_date") || null;
   let story = field("story");
   const files = data.getAll("photos");
   const revision = tripId ? requestId : null;
@@ -107,6 +108,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     if (existing.deleted_at) return editConflict();
     if (existing.revision === revision) return json(trip(existing));
     if (existing.revision !== expectedRevision) return editConflict();
+    if (!data.has("end_date")) endDate = existing.end_date ?? null;
     if (!data.has("tags")) tags.push(...JSON.parse(existing.tags));
     existingPhotos = JSON.parse(existing.photos);
     const rawKeys = field("photoKeys");
@@ -125,7 +127,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
   if (data.has("document")) {
     const raw = field("document");
     if (raw.length > 250000) return error("The story is too long.", 400);
-    try { document = normalizeDocument(JSON.parse(raw), photoKeys.length); }
+    try { document = normalizeDocument(JSON.parse(raw), photoKeys.length, { start: date, end: endDate }); }
     catch (failure) { return error(failure.message || "The story could not be read.", 400); }
     story = documentText(document);
     blocks = [{ type: "text", text: story }, ...photoKeys.map((_, index) => ({ type: "photo", index }))];
@@ -151,9 +153,12 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     blocks = [{ type: "text", text: story }, ...files.map((_, index) => ({ type: "photo", index }))];
   }
   if (!uuid.test(id) || !title || title.length > 100 || !destination || destination.length > 100 ||
-      !story || story.length > 20000 || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-      Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
+      !story || story.length > 20000 || !validDate(date)) {
     return error("Add a title, destination, valid date, and story.", 400);
+  }
+
+  if (endDate && (!validDate(endDate) || endDate < date)) {
+    return error("Choose an end date on or after the start date.", 400);
   }
 
   if (!tripId) {
@@ -204,17 +209,17 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
         });
       }
     }
-    const values = [title, destination, date, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
+    const values = [title, destination, date, endDate, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
     writeAttempted = true;
     if (tripId) {
-      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ? AND deleted_at IS NULL")
+      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, end_date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ? AND deleted_at IS NULL")
         .bind(...values, revision, owner, id, expectedRevision).run();
       if (!update.meta.changes) {
         conflict = true;
         throw new Error("The trip revision changed.");
       }
     } else {
-      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, story, photos, blocks, document, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, end_date, story, photos, blocks, document, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(id, owner, ...values).run();
     }
   } catch {
@@ -231,7 +236,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
   }
 
   if (tripId) await deletePhotos(bucket, existingPhotos, photos);
-  return json({ id, title, destination, date, story, photos, blocks, document, revision, tags }, tripId ? 200 : 201);
+  return json({ id, title, destination, date, end_date: endDate, story, photos, blocks, document, revision, tags }, tripId ? 200 : 201);
 }
 
 async function getPhoto(bucket, key, owner) {

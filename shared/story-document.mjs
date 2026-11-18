@@ -1,18 +1,34 @@
 // Versioned storage format. Photo indices refer only to this trip's uploaded files.
-export function normalizeDocument(value, photoCount) {
-  if (!value || value.version !== 1 || value.type !== "doc" || !Array.isArray(value.content)) {
+export function validDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) &&
+    new Date(value).toISOString().slice(0, 10) === value;
+}
+
+export function normalizeDocument(value, photoCount, range) {
+  if (!value || ![1, 2].includes(value.version) || value.type !== "doc" || !Array.isArray(value.content)) {
     throw new Error("The story document could not be read.");
   }
+  const version = value.version;
   let count = 0;
   const references = [];
   function node(value, parent, depth = 0) {
     if (++count > 2000 || depth > 12 || !value || typeof value !== "object") throw new Error("The story is too complex.");
     const allowed = {
-      doc: ["paragraph", "heading", "bulletList", "image"],
+      doc: ["paragraph", "heading", "bulletList", "image", ...(version === 2 ? ["daySection"] : [])],
+      daySection: ["paragraph", "heading", "bulletList", "image"],
       paragraph: ["text", "hardBreak"], heading: ["text", "hardBreak"],
       bulletList: ["listItem"], listItem: ["paragraph", "heading", "bulletList", "image"],
     };
     if (!allowed[parent]?.includes(value.type)) throw new Error("The story contains unsupported formatting.");
+    if (value.type === "daySection") {
+      const date = value.attrs?.date;
+      if (typeof date !== "string" || !validDate(date)) throw new Error("Choose a valid date for each story section.");
+      if (range && (date < range.start || date > (range.end || range.start))) {
+        throw new Error(`The section for ${date} falls outside the trip dates. Adjust the section or trip dates.`);
+      }
+      if (!Array.isArray(value.content) || !value.content.length) throw new Error("The dated section has no content blocks.");
+      return { type: "daySection", attrs: { date }, content: value.content.map(child => node(child, value.type, depth + 1)) };
+    }
     if (value.type === "text") {
       if (typeof value.text !== "string" || !value.text.length || value.text.length > 20000) throw new Error("The story text is invalid.");
       const marks = value.marks ?? [];
@@ -33,7 +49,7 @@ export function normalizeDocument(value, photoCount) {
     return { type: value.type, ...(value.type === "heading" ? { attrs: { level: 2 } } : {}),
       content: content.map(child => node(child, value.type, depth + 1)) };
   }
-  const document = { version: 1, type: "doc", content: value.content.map(child => node(child, "doc")) };
+  const document = { version, type: "doc", content: value.content.map(child => node(child, "doc")) };
   if (references.length !== photoCount || new Set(references).size !== references.length) throw new Error("Each photo must appear once in the story.");
   const text = documentText(document);
   if (!text.trim() || text.length > 20000) throw new Error("Write a story of up to 20,000 characters.");

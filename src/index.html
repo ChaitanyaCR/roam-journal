@@ -41,8 +41,9 @@
 
 <form id="trip-form"><fieldset>
 <label>Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
-<div class="form-row"><label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
-<label>Trip date<input name="date" type="date" required></label></div>
+<label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
+<div class="form-row"><label>Start date<input name="date" type="date" required></label>
+<label>End date (optional)<input name="end_date" type="date"></label></div>
 <label>Tags (comma-separated)<input name="tags" maxlength="500" placeholder="Family, hiking"></label>
 <section class="story-editor" aria-labelledby="editor-title">
 <h3 id="editor-title">Your story</h3>
@@ -52,6 +53,7 @@
 <button type="button" data-command="heading" aria-label="Heading" aria-pressed="false">H2</button>
 <button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false">• List</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
+<button type="button" id="add-day">＋ Dated section</button>
 <button type="button" id="insert-photo" class="photo-button">＋ Photo</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
 <button type="button" data-command="undo" aria-label="Undo">↶</button>

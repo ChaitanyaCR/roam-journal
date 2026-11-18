@@ -116,9 +116,13 @@ test("the viewer follows story order and supports keyboard and swipe navigation"
   const open = createPhotoViewer(dialog, () => {});
   open({
     title: "Goa", photos: [{ key: first }, { key: second }],
-    document: { type: "doc", content: [
-      { type: "image", attrs: { index: 1, caption: "First in the story" } },
-      { type: "image", attrs: { index: 0, caption: "Second in the story" } },
+    document: { type: "doc", version: 2, content: [
+      { type: "daySection", attrs: { date: "2026-12-31" }, content: [
+        { type: "image", attrs: { index: 1, caption: "First in the story" } },
+      ] },
+      { type: "daySection", attrs: { date: "2027-01-01" }, content: [
+        { type: "image", attrs: { index: 0, caption: "Second in the story" } },
+      ] },
     ] },
   }, second);
   assert.equal(dialog.open, true);
@@ -253,7 +257,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
       if (!failed) { failed = true; return Response.json({ message: "Temporary save failure" }, { status: 503 }); }
       saved = {
         id: options.body.get("id"), title: options.body.get("title"), destination: options.body.get("destination"),
-        tags: options.body.get("tags").split(","), date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
+        end_date: options.body.get("end_date"), tags: options.body.get("tags").split(","), date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
         document: JSON.parse(options.body.get("document")),
       };
       return Response.json(saved, { status: 201 });
@@ -285,12 +289,20 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   form.elements.namedItem("destination").value = "Goa";
   const editor = document.querySelector("#writing-editor .tiptap").editor;
   editor.commands.setContent("<p>A <strong>memory</strong></p>");
+  form.elements.date.value = "2026-12-31";
+  form.elements.end_date.value = "2027-01-01";
+  document.querySelector("#add-day").click();
+  assert.equal(editor.state.selection.$from.node(-1).type.name, "daySection");
+  editor.commands.insertContent("New Year's walk");
   const picker = document.querySelector("#files");
   Object.defineProperty(picker, "files", { value: [photo()] });
   picker.dispatchEvent(new window.Event("change"));
   document.querySelector("#composer [data-close]").click();
   await waitFor(() => !document.querySelector("#composer").open);
   const draft = await readDraft("account-one:new");
+  assert.equal(draft.fields.end_date, "2027-01-01");
+  assert.equal(draft.document.version, 2);
+  assert.equal(draft.document.content.find(node => node.type === "daySection").content.some(node => node.type === "image"), true);
   assert.equal(draft.fields.tags, "Coast,hiking");
   assert.equal(draft.fields.title, "My memory");
   assert.equal(draft.uploads[0].name, "beach.png");
@@ -299,6 +311,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(document.querySelector("#form-title").textContent, "Resume draft");
   assert.equal(form.elements.namedItem("tags").value, "Coast,hiking");
   assert.match(document.querySelector("#writing-editor figure img").getAttribute("src"), /^blob:/);
+  assert.equal(document.querySelector("#writing-editor .story-day input").value, "2027-01-01");
   document.querySelector("#writing-editor .photo-remove").click();
   const resumed = document.querySelector("#writing-editor .tiptap").editor;
   document.querySelector("#preview-toggle").click();
@@ -307,7 +320,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   await waitFor(() => !document.querySelector("#form-error").hidden);
   assert.match(document.querySelector("#form-error").textContent, /Temporary save failure/);
   assert.equal(resumed.isEditable, true);
-  assert.equal(resumed.getText().trim(), "A memory");
+  assert.match(resumed.getText(), /A memory[\s\S]*New Year.s walk/);
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await waitFor(() => !document.querySelector("#notice").hidden);
   assert.equal(submittedIds.length, 2);
@@ -325,6 +338,8 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(form.elements.namedItem("title").value, "My memory");
   assert.equal(form.elements.namedItem("destination").value, "Goa");
   assert.equal(form.elements.namedItem("date").value, saved.date);
+  assert.equal(form.elements.end_date.value, saved.end_date);
+  assert.equal(document.querySelector("#writing-editor .story-day input").value, saved.end_date);
   const reopened = document.querySelector("#writing-editor .tiptap").editor;
   assert.match(reopened.getHTML(), /<strong>memory<\/strong>/);
   form.elements.namedItem("tags").value = "Coast,rail";
@@ -384,7 +399,7 @@ test("Timeline groups trips by start month and shares its selection with Stories
   const base = { destination: "Goa", photos: [], story: "Train journey", tags: ["rail"] };
   globalThis.fetch = async () => Response.json([
     { ...base, id: "a", title: "Morning walk", date: "2025-01-01" },
-    { ...base, id: "c", title: "Winter visit", date: "2024-12-31" },
+    { ...base, id: "c", title: "Winter visit", date: "2024-12-31", end_date: "2025-01-02" },
     { ...base, id: "b", title: "Evening train", date: "2025-01-01", photos: [{ key: "station", alt: "Platform" }] },
     { ...base, id: "d", title: "Spring visit", date: "2025-03-01", tags: [] },
   ]);
@@ -414,6 +429,8 @@ test("Timeline groups trips by start month and shares its selection with Stories
   year.value = "2024";
   year.dispatchEvent(new window.Event("change"));
   document.querySelector(".timeline-trip").click();
+  assert.match(document.querySelector(".timeline-trip .trip-range").textContent, /2024.*2025/);
+  assert.match(document.querySelector(".detail-meta .trip-range").textContent, /2024.*2025/);
   assert.equal(document.querySelector("#detail-content h2").textContent, "Winter visit");
   document.querySelector("#detail [data-close]").click();
   document.querySelector('[data-view="stories"]').click();

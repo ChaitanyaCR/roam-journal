@@ -1,6 +1,6 @@
 # Phase 3 · Multi-day trips and World Map
 
-**Status** Next phase. Start with multi-day writing, then add World Map. Shared filters, daily Timeline milestones and Trash are implemented.
+**Status** In progress. Multi-day writing is implemented. World Map is next.
 
 ## Multi-day writing
 
@@ -8,7 +8,7 @@ Keep the existing trip date as the start date and add an optional inclusive end 
 
 Use calendar dates consistently across the editor, Timeline and reader. Reject an end before the start and flag sections outside the trip range before saving. Show the range in trip detail and Timeline. A trip crossing New Year appears once under its start date’s Timeline milestone. Trips with the same start date share that milestone, even when their end dates differ.
 
-**Proposed implementation** Add an optional D1 end date and extend the versioned story format for dated sections. Update document validation, legacy conversion, editing, draft recovery, reading, photo traversal and search together. Keep the previous document version readable.
+Migration 0006 adds a nullable end date. The editor appends a dated section after the existing story and lets the writer edit the section date. Stories with dated sections use document version 2. Plain-text, block-based and version 1 entries remain readable and editable. The editor and Worker validate section dates against the inclusive trip range on submission. Drafts retain unfinished sections and pending photos.
 
 ## World Map
 

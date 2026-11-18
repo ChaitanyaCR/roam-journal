@@ -12,17 +12,17 @@ function storage({ failInsert = false } = {}) {
     async first() { return rows.get(args[0] + ":" + args[1]) ?? null; },
     async run() {
       if (sql.startsWith("UPDATE trips")) {
-        const [title, destination, date, story, photos, blocks, document, tags, revision, owner, id, expectedRevision] = args;
+        const [title, destination, date, end_date, story, photos, blocks, document, tags, revision, owner, id, expectedRevision] = args;
         const key = owner + ":" + id;
         const row = rows.get(key);
         if (!row || row.revision !== expectedRevision) return { meta: { changes: 0 } };
-        rows.set(key, { ...row, title, destination, date, story, photos, blocks, document, tags, revision });
+        rows.set(key, { ...row, title, destination, date, end_date, story, photos, blocks, document, tags, revision });
         return { meta: { changes: 1 } };
       }
       assert.match(sql, /INSERT INTO trips/);
       if (failInsert) throw new Error("Database unavailable");
-      const [id, owner, title, destination, date, story, photos, blocks, document, tags] = args;
-      rows.set(owner + ":" + id, { id, owner, title, destination, date, story, photos, blocks, document, tags, revision: null });
+      const [id, owner, title, destination, date, end_date, story, photos, blocks, document, tags] = args;
+      rows.set(owner + ":" + id, { id, owner, title, destination, date, end_date, story, photos, blocks, document, tags, revision: null });
     },
   }; } }; } };
   const BUCKET = {
@@ -154,7 +154,7 @@ test("rich documents preserve formatting, captions, and photo positions after re
 test("rich documents reject unsafe formatting, invalid structure, and foreign photo references", async () => {
   const text = { type: "paragraph", content: [{ type: "text", text: "A story" }] };
   for (const [document, count] of [
-    [{ version: 2, type: "doc", content: [text] }, 0],
+    [{ version: 3, type: "doc", content: [text] }, 0],
     [{ version: 1, type: "doc", content: [{ type: "script", content: [] }] }, 0],
     [{ version: 1, type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Link", marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }] }] }] }, 0],
     [{ version: 1, type: "doc", content: [text, { type: "image", attrs: { index: 8, src: "/api/photos/foreign" } }] }, 1],
@@ -273,4 +273,47 @@ test("trash and restore preserve the entire trip and reject stale and cross-acco
   assert.deepEqual(restored, { ...saved, deleted_at: null, revision: restoration });
   const photo = await worker.fetch(request("GET", undefined, "alice", "/api/photos/" + saved.photos[0].key), env);
   assert.deepEqual(Buffer.from(await photo.arrayBuffer()), png);
+});
+
+test("a legacy story can gain dated sections and retain its photo and date range across edits", async () => {
+  const env = storage();
+  const create = form(undefined, 1);
+  create.set("date", "2026-12-31");
+  create.set("story", "Before midnight");
+  const saved = await (await worker.fetch(request("POST", create), env)).json();
+  assert.equal(saved.end_date, null);
+  const path = "/api/trips/" + saved.id;
+  const edit = form();
+  edit.set("date", saved.date);
+  edit.set("end_date", "2027-01-01");
+  edit.set("revision", "");
+  edit.set("photoKeys", JSON.stringify([saved.photos[0].key]));
+  const paragraph = text => ({ type: "paragraph", content: [{ type: "text", text }] });
+  const day = { type: "daySection", attrs: { date: "2027-01-01" }, content: [
+    paragraph("First sunrise"), { type: "image", attrs: { index: 0, caption: "Dawn" } },
+  ] };
+  const doc = { type: "doc", version: 2, content: [paragraph(saved.story), day] };
+  edit.set("document", JSON.stringify(doc));
+  const patch = () => worker.fetch(request("PATCH", edit, "alice", path), env);
+  const updated = await (await patch()).json();
+  assert.deepEqual(updated.document, doc);
+  assert.equal(updated.end_date, "2027-01-01");
+  assert.match(updated.story, /Before midnight[\s\S]*First sunrise/);
+  assert.deepEqual(updated.photos, [{ key: saved.photos[0].key, alt: "Dawn" }]);
+  edit.set("revision", updated.revision);
+  edit.set("id", crypto.randomUUID());
+  for (const invalidEnd of ["2026-12-30", "2027-02-29", ""]) {
+    edit.set("end_date", invalidEnd);
+    assert.equal((await patch()).status, 400);
+  }
+  edit.delete("end_date");
+  day.attrs.date = "2027-01-02";
+  edit.set("document", JSON.stringify(doc));
+  assert.equal((await patch()).status, 400);
+  day.attrs.date = "2027-01-01";
+  edit.set("document", JSON.stringify(doc));
+  assert.equal((await (await patch()).json()).end_date, "2027-01-01");
+  const [listed] = await (await worker.fetch(request("GET"), env)).json();
+  assert.deepEqual(listed.document, doc);
+  assert.equal(listed.end_date, "2027-01-01");
 });

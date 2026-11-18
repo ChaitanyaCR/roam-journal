@@ -15,7 +15,7 @@ The editor accepts comma-separated tags and keeps the unfinished field in the lo
 
 Search, year and tag selections apply together and persist when switching views. Year and tag choices come from all active trips and refresh after saves. Clearing filters from an empty result restores all trips or photos in the current view.
 
-Timeline groups trips under their start year and month, newest first. Trips with the same date are ordered by descending trip ID. Each entry opens the existing trip detail. Each date has one milestone. Stories from that date stack vertically as cards with a cover image on the left and title on the right. Date groups alternate along a dotted line on desktop and follow a single column on phones. Date ranges will follow in Phase 3.
+Timeline groups trips under their start year and month, newest first. Trips with the same date are ordered by descending trip ID. Each entry opens the existing trip detail. Each date has one milestone. Stories from that date stack vertically as cards with a cover image on the left and title on the right. Date groups alternate along a dotted line on desktop and follow a single column on phones. Multi-day cards show the date range under the shared start-date milestone.
 
 Open a trip and choose **Move to Trash** to remove it from all three browsing views and search. Open the trip in **Trash** and choose **Restore trip** to return it to the journal. Both actions check ownership and revision. Migration 0005 stores the deletion timestamp and keeps existing entries active.
 
