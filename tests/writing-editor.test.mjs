@@ -253,7 +253,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
       if (!failed) { failed = true; return Response.json({ message: "Temporary save failure" }, { status: 503 }); }
       saved = {
         id: options.body.get("id"), title: options.body.get("title"), destination: options.body.get("destination"),
-        date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
+        tags: options.body.get("tags").split(","), date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
         document: JSON.parse(options.body.get("document")),
       };
       return Response.json(saved, { status: 201 });
@@ -265,12 +265,14 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
       assert.equal(options.body.get("revision"), "");
       assert.equal(options.body.get("photoKeys"), "[]");
       saved = {
-        ...saved, title: options.body.get("title"), revision: options.body.get("id"),
+        ...saved, tags: options.body.get("tags").split(","), title: options.body.get("title"), revision: options.body.get("id"),
         document: JSON.parse(options.body.get("document")),
       };
       return Response.json(saved);
     }
-    return Response.json(saved ? [saved] : [], { headers: { "X-Roam-Draft-Scope": "account-one" } });
+    const older = { id: "older", title: "Earlier journey", destination: "Paris", date: "2020-01-01",
+      tags: ["coast"], story: "A walk by the river", photos: [{ key: "arch", alt: "Stone archway" }] };
+    return Response.json(saved ? [saved, older] : [], { headers: { "X-Roam-Draft-Scope": "account-one" } });
   };
   t.after(() => { globalThis.fetch = originalFetch; globalThis.FormData = originalFormData; });
   await import("../src/journal.js");
@@ -278,6 +280,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   document.querySelector("[data-add]").click();
   await waitFor(() => document.querySelector("#composer").open);
   const form = document.querySelector("#trip-form");
+  form.elements.namedItem("tags").value = "Coast,hiking";
   form.elements.namedItem("title").value = "My memory";
   form.elements.namedItem("destination").value = "Goa";
   const editor = document.querySelector("#writing-editor .tiptap").editor;
@@ -288,11 +291,13 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   document.querySelector("#composer [data-close]").click();
   await waitFor(() => !document.querySelector("#composer").open);
   const draft = await readDraft("account-one:new");
+  assert.equal(draft.fields.tags, "Coast,hiking");
   assert.equal(draft.fields.title, "My memory");
   assert.equal(draft.uploads[0].name, "beach.png");
   document.querySelector("[data-add]").click();
   await waitFor(() => document.querySelector("#composer").open);
   assert.equal(document.querySelector("#form-title").textContent, "Resume draft");
+  assert.equal(form.elements.namedItem("tags").value, "Coast,hiking");
   assert.match(document.querySelector("#writing-editor figure img").getAttribute("src"), /^blob:/);
   document.querySelector("#writing-editor .photo-remove").click();
   const resumed = document.querySelector("#writing-editor .tiptap").editor;
@@ -322,6 +327,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(form.elements.namedItem("date").value, saved.date);
   const reopened = document.querySelector("#writing-editor .tiptap").editor;
   assert.match(reopened.getHTML(), /<strong>memory<\/strong>/);
+  form.elements.namedItem("tags").value = "Coast,rail";
   form.elements.namedItem("title").value = "Updated memory";
   reopened.commands.setContent("<p>An <em>updated</em> memory</p>");
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
@@ -335,5 +341,37 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(document.querySelector("#composer").open, false);
   assert.equal(document.querySelector("#detail-content h2").textContent, "Updated memory");
   assert.equal(document.querySelector("#detail-content .rich-story em").textContent, "updated");
-  assert.equal(document.querySelectorAll(".cards .card").length, 1);
+  assert.equal(document.querySelectorAll(".cards .card").length, 2);
+  document.querySelector("#detail [data-close]").click();
+  const search = document.querySelector("#trip-search");
+  const year = document.querySelector("#trip-year");
+  const tag = document.querySelector("#trip-tag");
+  assert.deepEqual([...tag.options].map(option => option.value), ["", "coast", "rail"]);
+  assert.deepEqual([...year.options].map(option => option.value), ["", saved.date.slice(0, 4), "2020"]);
+  year.value = "2020";
+  year.dispatchEvent(new window.Event("change"));
+  assert.equal(document.querySelectorAll(".card").length, 1);
+  tag.value = "rail";
+  tag.dispatchEvent(new window.Event("change"));
+  assert.equal(document.querySelectorAll(".card").length, 0);
+  tag.value = "coast";
+  tag.dispatchEvent(new window.Event("change"));
+  search.value = "ARCHWAY";
+  search.dispatchEvent(new window.Event("input"));
+  assert.equal(document.querySelector(".cards").textContent.includes("Earlier journey"), true);
+  assert.equal(document.querySelectorAll(".card").length, 1);
+  document.querySelector('[data-view="gallery"]').click();
+  assert.equal(document.querySelectorAll(".gallery-tile").length, 1);
+  assert.equal(year.value, "2020");
+  assert.equal(tag.value, "coast");
+  assert.equal(search.value, "ARCHWAY");
+  assert.equal(document.querySelector(".gallery-tile img").getAttribute("src"), "/api/photos/arch");
+  search.value = "absent";
+  search.dispatchEvent(new window.Event("input"));
+  assert.equal(document.querySelectorAll(".gallery-tile").length, 0);
+  document.querySelector(".empty button").click();
+  assert.equal(search.value, "");
+  assert.equal(year.value, "");
+  assert.equal(tag.value, "");
+  assert.equal(document.querySelectorAll(".gallery-tile").length, 1);
 });

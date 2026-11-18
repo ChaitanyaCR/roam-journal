@@ -131,3 +131,10 @@ dialog.writing-composer{width:100%;max-width:none;height:100dvh;max-height:100dv
 }
 #photo-viewer .photo-stage img{width:100%;height:100%;min-height:0;object-fit:contain}
 #photo-viewer figcaption{margin:8px 0 0;text-align:center;color:#e0ded2}
+
+#trip-filters{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+#trip-filters label{flex:1 1 9rem;min-width:0}
+#trip-filters label:first-child{flex:3 1 20rem}
+#trip-filters select{width:100%;font:inherit;color:var(--ink);background:#fffaf3;border:1px solid #d6cdbd;border-radius:6px;padding:9px 10px}
+#trip-filters select:focus-visible{outline:3px solid #c27f46;outline-offset:3px}
+.trip-tags{color:var(--muted);overflow-wrap:anywhere}

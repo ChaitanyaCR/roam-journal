@@ -25,6 +25,11 @@
 </div></section>
 <section id="journal" class="journal" aria-labelledby="journal-title">
 <div class="section-heading"><h2 id="journal-title">Trip stories</h2><span id="count"></span></div>
+<div id="trip-filters" role="group" aria-label="Filter trips" hidden>
+<label>Search trips<input id="trip-search" type="search" placeholder="Title, destination, story or caption"></label>
+<label>Year<select id="trip-year"><option value="">All years</option></select></label>
+<label>Tag<select id="trip-tag"><option value="">All tags</option></select></label>
+</div>
 <p id="notice" class="notice" role="status" hidden></p>
 <div id="entries"><div class="empty" role="status">Opening your journal…</div></div>
 </section>
@@ -38,6 +43,7 @@
 <label>Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
 <div class="form-row"><label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
 <label>Trip date<input name="date" type="date" required></label></div>
+<label>Tags (comma-separated)<input name="tags" maxlength="500" placeholder="Family, hiking"></label>
 <section class="story-editor" aria-labelledby="editor-title">
 <h3 id="editor-title">Your story</h3>
 <div id="editor-toolbar" class="writing-toolbar" role="group" aria-label="Story formatting">

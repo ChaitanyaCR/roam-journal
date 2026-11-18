@@ -12,17 +12,17 @@ function storage({ failInsert = false } = {}) {
     async first() { return rows.get(args[0] + ":" + args[1]) ?? null; },
     async run() {
       if (sql.startsWith("UPDATE trips")) {
-        const [title, destination, date, story, photos, blocks, document, revision, owner, id, expectedRevision] = args;
+        const [title, destination, date, story, photos, blocks, document, tags, revision, owner, id, expectedRevision] = args;
         const key = owner + ":" + id;
         const row = rows.get(key);
         if (!row || row.revision !== expectedRevision) return { meta: { changes: 0 } };
-        rows.set(key, { ...row, title, destination, date, story, photos, blocks, document, revision });
+        rows.set(key, { ...row, title, destination, date, story, photos, blocks, document, tags, revision });
         return { meta: { changes: 1 } };
       }
       assert.match(sql, /INSERT INTO trips/);
       if (failInsert) throw new Error("Database unavailable");
-      const [id, owner, title, destination, date, story, photos, blocks, document] = args;
-      rows.set(owner + ":" + id, { id, owner, title, destination, date, story, photos, blocks, document, revision: null });
+      const [id, owner, title, destination, date, story, photos, blocks, document, tags] = args;
+      rows.set(owner + ":" + id, { id, owner, title, destination, date, story, photos, blocks, document, tags, revision: null });
     },
   }; } }; } };
   const BUCKET = {
@@ -62,13 +62,16 @@ test("mixed story sections survive save, reload, and retry in the same order", a
     { type: "text", text: "The way home." },
   ];
   const data = form(blocks, 2);
+  data.set("tags", " Coast, hiking, coast, ");
   const response = await worker.fetch(request("POST", data), env);
   assert.equal(response.status, 201);
   const saved = await response.json();
+  assert.deepEqual(saved.tags, ["Coast", "hiking"]);
   assert.deepEqual(saved.blocks, blocks);
   assert.equal(saved.story, "Arriving.\n\nWalking along the beach.\n\nThe way home.");
   assert.equal(saved.photos[1].alt, "Caption 1");
   const listed = await (await worker.fetch(request("GET"), env)).json();
+  assert.deepEqual(listed[0].tags, saved.tags);
   assert.deepEqual(listed[0].blocks, blocks);
   assert.equal((await worker.fetch(request("POST", data), env)).status, 200);
   assert.equal(env.objects.size, 2);

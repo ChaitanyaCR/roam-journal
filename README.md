@@ -6,6 +6,8 @@ New trip opens a full-screen Tiptap editor with continuous writing, bold/italic/
 
 Run `npm run build` to produce the Worker at `dist/server/index.js`. Schema migrations are in `drizzle/`. The deployment requires the DB and BUCKET bindings declared in `.openai/hosting.json`.
 
+See the [phase specifications](specification/README.md) for the roadmap, implementation status, and acceptance checks for each phase.
+
 ## Local development
 
 Use Node.js 22 or later. Install dependencies and initialize the local database:

@@ -30,6 +30,10 @@ let draftStamp;
 let persistedStamp;
 let draftTimer;
 let draftWrites = Promise.resolve();
+const search = $("#trip-search");
+const yearFilter = $("#trip-year");
+const tagFilter = $("#trip-tag");
+const draftFields = ["title", "destination", "date", "tags"];
 const dateLabel = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
 
 function element(tag, text = "", className = "") {
@@ -94,6 +98,7 @@ function showDetail(trip, notice) {
   const meta = element("div", "", "detail-meta");
   meta.append(date, button("Edit trip", "secondary", () => openComposer(trip)));
   content.append(meta);
+  if (trip.tags?.length) content.append(element("p", trip.tags.join(" · "), "trip-tags"));
   if (notice) {
     const status = element("p", notice, "notice");
     status.setAttribute("role", "status");
@@ -117,11 +122,48 @@ function tripCard(trip) {
   return card;
 }
 
+function updateOptions(select, choices) {
+  const previous = select.value;
+  select.replaceChildren(select.options[0], ...choices.map(([value, label]) => {
+    const option = element("option", label);
+    option.value = value;
+    return option;
+  }));
+  select.value = choices.some(([value]) => value === previous) ? previous : "";
+}
+
+function setTrips(next) {
+  trips = next;
+  const years = new Set();
+  const tags = new Map();
+  for (const trip of trips) {
+    years.add(trip.date.slice(0, 4));
+    for (const tag of trip.tags ?? []) {
+      const key = tag.toLowerCase();
+      if (!tags.has(key)) tags.set(key, tag);
+    }
+  }
+  updateOptions(yearFilter, [...years].sort().reverse().map(year => [year, year]));
+  updateOptions(tagFilter, [...tags].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function filteredTrips(query, year, tag) {
+  return trips.filter(trip => {
+    if (year && trip.date.slice(0, 4) !== year) return false;
+    if (tag && !trip.tags?.some(value => value.toLowerCase() === tag)) return false;
+    return !query || [trip.title, trip.destination, trip.story, ...trip.photos.map(photo => photo.alt)]
+      .some(value => value?.toLowerCase().includes(query));
+  });
+}
+
 function render() {
   const entries = $("#entries");
   const count = $("#count");
   const stories = view === "stories";
-  const photos = trips.flatMap(trip => trip.photos.map(photo => ({ trip, photo })));
+  $("#trip-filters").hidden = state !== "ready";
+  const query = search.value.trim().toLowerCase();
+  const matching = filteredTrips(query, yearFilter.value, tagFilter.value);
+  const photos = matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo })));
   entries.replaceChildren();
   $("#journal-title").textContent = stories ? "Trip stories" : "Photo gallery";
   count.textContent = "";
@@ -145,17 +187,29 @@ function render() {
   } else if (state === "signed-out") {
     empty.append(element("h3", "Sign in to view your journal"));
   } else {
-    const length = stories ? trips.length : photos.length;
+    const length = stories ? matching.length : photos.length;
     count.textContent = length + (stories ? " trip" : " photo") + (length === 1 ? "" : "s");
     if (length) {
       const grid = element("div", "", stories ? "cards" : "gallery");
-      if (stories) grid.append(...trips.map(tripCard));
+      if (stories) grid.append(...matching.map(tripCard));
       else grid.append(...photos.map(({ trip, photo }) => {
         const tile = button("", "gallery-tile", event => openPhotos(trip, photo.key, event.currentTarget));
         tile.append(image(photo, trip), element("span", trip.destination));
         return tile;
       }));
       entries.append(grid);
+      return;
+    }
+    if (query || yearFilter.value || tagFilter.value) {
+      empty.append(element("h3", matching.length ? "Matching trips have no photos" : "No matching trips"),
+        button("Clear filters", "secondary", () => {
+          search.value = "";
+          yearFilter.value = "";
+          tagFilter.value = "";
+          render();
+          search.focus();
+        }));
+      entries.append(empty);
       return;
     }
     const icon = element("span", stories ? "✎" : "▧", "empty-icon");
@@ -166,6 +220,10 @@ function render() {
   }
   entries.append(empty);
 }
+
+search.addEventListener("input", render);
+yearFilter.addEventListener("change", render);
+tagFilter.addEventListener("change", render);
 
 async function load() {
   state = "loading";
@@ -178,7 +236,7 @@ async function load() {
     }
     else {
       if (!response.ok) throw new Error();
-      trips = await response.json();
+      setTrips(await response.json());
       draftScope = response.headers.get("X-Roam-Draft-Scope");
       state = "ready";
     }
@@ -249,10 +307,13 @@ async function openComposer(trip = null) {
   save.textContent = trip ? "Save changes" : "Save trip";
   const today = new Date();
   form.elements.title.value = trip?.title ?? "";
+  form.elements.tags.value = trip?.tags?.join(",") ?? "";
   form.elements.destination.value = trip?.destination ?? "";
   form.elements.date.value = trip?.date ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   if (draft) {
-    for (const name of ["title", "destination", "date"]) form.elements[name].value = draft.fields[name];
+    for (const name of draftFields) {
+      if (draft.fields[name] !== undefined) form.elements[name].value = draft.fields[name];
+    }
   }
   discard.hidden = !draft;
   const storedTime = draft && new Date(draft.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -276,7 +337,7 @@ async function persistDraft() {
   const savedAt = Date.now();
   try {
     requestId ??= crypto.randomUUID();
-    const fields = Object.fromEntries(["title", "destination", "date"].map(name => [name, form.elements[name].value]));
+    const fields = Object.fromEntries(draftFields.map(name => [name, form.elements[name].value]));
     const snapshot = writing.snapshot();
     const uploads = snapshot.uploads.map(file => ({ blob: file, name: file.name }));
     const entry = { ...snapshot, uploads, fields, stamp, savedAt, requestId, baseRevision };
@@ -459,8 +520,8 @@ form.addEventListener("submit", async event => {
     clearFiles();
     editingTrip = null;
     if (trip) {
-      trips = trips.map(item => item.id === result.id ? result : item)
-        .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+      setTrips(trips.map(item => item.id === result.id ? result : item)
+        .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)));
       render();
       showDetail(result, draftCleanupFailed ? "Trip updated. The browser could not clear its draft." : "Trip updated.");
       detail.querySelector("[data-close]").focus();
@@ -468,7 +529,7 @@ form.addEventListener("submit", async event => {
     }
     await load();
     if (state !== "ready") {
-      trips = [result, ...trips.filter(item => item.id !== result.id)].sort((a, b) => b.date.localeCompare(a.date));
+      setTrips([result, ...trips.filter(item => item.id !== result.id)].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)));
       state = "ready";
     }
     changeView("stories");

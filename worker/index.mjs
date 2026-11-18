@@ -3,7 +3,7 @@ import { normalizeDocument, documentText } from "../shared/story-document.mjs";
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 const MB = 1024 * 1024;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision";
+const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags";
 const photoLimit = "Choose up to 12 JPG, PNG, or WebP photos, up to 8 MB each and 28 MB total.";
 const formats = {
   "image/jpeg": b => b[0] === 255 && b[1] === 216 && b[2] === 255,
@@ -26,7 +26,7 @@ function trip(row) {
     { type: "text", text: row.story },
     ...photos.map((_, index) => ({ type: "photo", index })),
   ];
-  return { ...row, photos, blocks, document: row.document ? JSON.parse(row.document) : null };
+  return { ...row, tags: JSON.parse(row.tags), photos, blocks, document: row.document ? JSON.parse(row.document) : null };
 }
 
 async function listTrips(db, owner) {
@@ -61,6 +61,18 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
   const lookup = () => db.prepare(`SELECT ${tripColumns} FROM trips WHERE owner = ? AND id = ?`).bind(owner, id).first();
   const title = field("title");
   const destination = field("destination");
+  const rawTags = field("tags");
+  if (rawTags.length > 500) return error("Keep tags under 501 characters in total.", 400);
+  const tags = [];
+  const seenTags = new Set();
+  for (const part of rawTags.split(",")) {
+    const tag = part.trim();
+    const key = tag.toLowerCase();
+    if (tag && !seenTags.has(key)) {
+      tags.push(tag);
+      seenTags.add(key);
+    }
+  }
   const date = field("date");
   let story = field("story");
   const files = data.getAll("photos");
@@ -77,6 +89,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     if (!existing) return error("Trip not found.", 404);
     if (existing.revision === revision) return json(trip(existing));
     if (existing.revision !== expectedRevision) return editConflict();
+    if (!data.has("tags")) tags.push(...JSON.parse(existing.tags));
     existingPhotos = JSON.parse(existing.photos);
     const rawKeys = field("photoKeys");
     if (rawKeys.length > 1024) return error(photoLimit, 400);
@@ -172,17 +185,17 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
         });
       }
     }
-    const values = [title, destination, date, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null];
+    const values = [title, destination, date, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
     writeAttempted = true;
     if (tripId) {
-      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, story = ?, photos = ?, blocks = ?, document = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ?")
+      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ?")
         .bind(...values, revision, owner, id, expectedRevision).run();
       if (!update.meta.changes) {
         conflict = true;
         throw new Error("The trip revision changed.");
       }
     } else {
-      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, story, photos, blocks, document) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, story, photos, blocks, document, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(id, owner, ...values).run();
     }
   } catch {
@@ -198,7 +211,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
   }
 
   if (tripId) await deletePhotos(bucket, existingPhotos, photos);
-  return json({ id, title, destination, date, story, photos, blocks, document, revision }, tripId ? 200 : 201);
+  return json({ id, title, destination, date, story, photos, blocks, document, revision, tags }, tripId ? 200 : 201);
 }
 
 async function getPhoto(bucket, key, owner) {
