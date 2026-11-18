@@ -5,7 +5,7 @@ Roam Journal is a private travel diary. A trip owns its story and photos. Storie
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | [1 · Draft recovery and photo viewing](phase-1-drafts-and-photos.md) | Resume unfinished writing and browse a trip’s photos full screen | Implemented. Hands-on browser and mobile review remains open. |
-| [2 · Find and organize trips](phase-2-discovery-and-trash.md) | Search, tags, shared filters, Timeline and recoverable deletion | In progress. Tags, search and shared filters implemented. Timeline is next. |
+| [2 · Find and organize trips](phase-2-discovery-and-trash.md) | Search, tags, shared filters, Timeline and recoverable deletion | In progress. Tags, search, shared filters and Timeline implemented. Trash and restore are next. |
 | [3 · Multi-day trips and World Map](phase-3-multi-day-and-map.md) | Date ranges, dated story sections and city pins | Planned. Builds on Phase 2 browsing. |
 | [4 · Portable export](phase-4-export.md) | A downloadable ZIP with offline stories, original photos and structured data | Planned. Includes the Phase 2 and 3 data. |
 

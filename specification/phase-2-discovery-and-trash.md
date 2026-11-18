@@ -1,6 +1,6 @@
 # Phase 2 · Search, tags, Timeline and Trash
 
-**Status** In progress. Tags, search and shared year and tag filters are implemented in Stories and Gallery. Timeline is next, followed by Trash.
+**Status** In progress. Stories, Gallery and Timeline share search, year and tag filters. Trash and restore are next.
 
 ## Delivery order
 
@@ -18,6 +18,8 @@ Use a migration for tags and a nullable deletion timestamp. Extend the existing 
 The editor accepts comma-separated tags and keeps the unfinished field in the local draft. Saving trims whitespace and keeps the first spelling of each case-insensitive tag. Migration 0004 gives older entries an empty tag list. Search keeps its query when switching between Stories and Gallery and matches the saved title, destination, story text and photo captions.
 
 Search, year and tag selections apply together and persist when switching views. Year and tag choices come from the full trip list and refresh after saves. Clearing filters from an empty result restores all trips or photos in the current view.
+
+Timeline groups trips under their start year and month, newest first. Trips with the same date are ordered by descending trip ID. Each entry opens the existing trip detail. Each date has one milestone. Stories from that date stack vertically as cards with a cover image on the left and title on the right. Date groups alternate along a dotted line on desktop and follow a single column on phones. Date ranges will follow in Phase 3.
 
 ## Acceptance checks
 

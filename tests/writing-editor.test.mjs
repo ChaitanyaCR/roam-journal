@@ -375,3 +375,55 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(tag.value, "");
   assert.equal(document.querySelectorAll(".gallery-tile").length, 1);
 });
+
+test("Timeline groups trips by start month and shares its selection with Stories", async t => {
+  const html = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
+  document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const base = { destination: "Goa", photos: [], story: "Train journey", tags: ["rail"] };
+  globalThis.fetch = async () => Response.json([
+    { ...base, id: "a", title: "Morning walk", date: "2025-01-01" },
+    { ...base, id: "c", title: "Winter visit", date: "2024-12-31" },
+    { ...base, id: "b", title: "Evening train", date: "2025-01-01", photos: [{ key: "station", alt: "Platform" }] },
+    { ...base, id: "d", title: "Spring visit", date: "2025-03-01", tags: [] },
+  ]);
+  await import("../src/journal.js?timeline-test");
+  await waitFor(() => document.querySelector(".card"));
+  document.querySelector('[data-view="timeline"]').click();
+  const texts = selector => [...document.querySelectorAll(selector)].map(node => node.textContent);
+  assert.deepEqual(texts(".timeline h3"), ["2025", "2024"]);
+  assert.deepEqual(texts(".timeline h4"), ["March", "January", "December"]);
+  assert.deepEqual(texts(".timeline ul:nth-of-type(2) strong"), ["Evening train", "Morning walk"]);
+  assert.deepEqual([...document.querySelectorAll(".timeline li")].map(item => item.className),
+    ["timeline-left", "timeline-right", "timeline-left"]);
+  const sameDay = document.querySelector(".timeline-right .timeline-day");
+  assert.equal(sameDay.querySelectorAll("time").length, 1);
+  assert.equal(sameDay.querySelector("time").dateTime, "2025-01-01");
+  const cards = sameDay.querySelectorAll(".timeline-trip");
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].firstElementChild.getAttribute("src"), "/api/photos/station");
+  assert.equal(cards[1].firstElementChild.className, "timeline-placeholder");
+  for (const card of cards) {
+    card.click();
+    assert.equal(document.querySelector("#detail-content h2").textContent, card.querySelector("strong").textContent);
+    document.querySelector("#detail [data-close]").click();
+  }
+  assert.equal(document.querySelector("#count").textContent, "4 trips");
+  const year = document.querySelector("#trip-year");
+  year.value = "2024";
+  year.dispatchEvent(new window.Event("change"));
+  document.querySelector(".timeline-trip").click();
+  assert.equal(document.querySelector("#detail-content h2").textContent, "Winter visit");
+  document.querySelector("#detail [data-close]").click();
+  document.querySelector('[data-view="stories"]').click();
+  assert.equal(year.value, "2024");
+  assert.deepEqual(texts(".card h3"), ["Winter visit"]);
+  document.querySelector('[data-view="timeline"]').click();
+  const search = document.querySelector("#trip-search");
+  search.value = "Missing trip";
+  search.dispatchEvent(new window.Event("input"));
+  assert.equal(document.querySelector("#count").textContent, "0 trips");
+  document.querySelector(".empty button").click();
+  assert.equal(document.querySelectorAll(".timeline-trip").length, 4);
+});

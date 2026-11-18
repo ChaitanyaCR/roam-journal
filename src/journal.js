@@ -36,6 +36,8 @@ const tagFilter = $("#trip-tag");
 const draftFields = ["title", "destination", "date", "tags"];
 const dateLabel = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
 
+const monthLabel = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" });
+
 function element(tag, text = "", className = "") {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -48,6 +50,12 @@ function button(text, className, click) {
   node.type = "button";
   node.addEventListener("click", click);
   return node;
+}
+
+function tripDate(trip) {
+  const date = element("time", dateLabel.format(new Date(trip.date)));
+  date.dateTime = trip.date;
+  return date;
 }
 
 function image(photo, trip) {
@@ -63,8 +71,7 @@ function showDetail(trip, notice) {
   content.replaceChildren();
   content.append(element("p", trip.destination, "location"));
   content.append(element("h2", trip.title));
-  const date = element("time", dateLabel.format(new Date(trip.date)));
-  date.dateTime = trip.date;
+  const date = tripDate(trip);
   const story = element("div", "", "story-content");
   const sections = trip.blocks || [
     { type: "text", text: trip.story },
@@ -114,8 +121,7 @@ function tripCard(trip) {
   const card = button("", "card", () => showDetail(trip));
   card.append(trip.photos[0] ? image(trip.photos[0], trip) : element("div", "✧", "no-cover"));
   const copy = element("div", "", "card-copy");
-  const date = element("time", dateLabel.format(new Date(trip.date)));
-  date.dateTime = trip.date;
+  const date = tripDate(trip);
   copy.append(element("span", trip.destination, "location"), element("h3", trip.title), date,
     element("p", trip.story), element("span", "Read story →", "read"));
   card.append(copy);
@@ -133,7 +139,7 @@ function updateOptions(select, choices) {
 }
 
 function setTrips(next) {
-  trips = next;
+  trips = next.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const years = new Set();
   const tags = new Map();
   for (const trip of trips) {
@@ -156,16 +162,59 @@ function filteredTrips(query, year, tag) {
   });
 }
 
+function timeline(matching) {
+  const root = element("div", "", "timeline");
+  let previousMonth = "";
+  let yearSection;
+  let list;
+  let day;
+  let previousDate;
+  let dayIndex = 0;
+  for (const trip of matching) {
+    const year = trip.date.slice(0, 4);
+    const month = trip.date.slice(0, 7);
+    if (year !== previousMonth.slice(0, 4)) {
+      yearSection = element("section");
+      yearSection.append(element("h3", year));
+      root.append(yearSection);
+    }
+    if (month !== previousMonth) {
+      list = element("ul");
+      yearSection.append(element("h4", monthLabel.format(new Date(trip.date))), list);
+      previousMonth = month;
+    }
+    if (trip.date !== previousDate) {
+      const item = element("li", "", dayIndex % 2 === 0 ? "timeline-left" : "timeline-right");
+      item.dataset.color = String(dayIndex % 6);
+      day = element("div", "", "timeline-day");
+      day.append(tripDate(trip));
+      item.append(day);
+      list.append(item);
+      previousDate = trip.date;
+      dayIndex++;
+    }
+    const card = button("", "timeline-trip", () => showDetail(trip));
+    const cover = trip.photos[0] ? image(trip.photos[0], trip) : element("span", "✧", "timeline-placeholder");
+    cover.setAttribute("aria-hidden", "true");
+    const copy = element("span", "", "timeline-copy");
+    copy.append(element("strong", trip.title), element("span", trip.destination, "location"));
+    if (trip.story) copy.append(element("span", trip.story, "timeline-excerpt"));
+    card.append(cover, copy);
+    day.append(card);
+  }
+  return root;
+}
+
 function render() {
   const entries = $("#entries");
   const count = $("#count");
-  const stories = view === "stories";
+  const gallery = view === "gallery";
   $("#trip-filters").hidden = state !== "ready";
   const query = search.value.trim().toLowerCase();
   const matching = filteredTrips(query, yearFilter.value, tagFilter.value);
-  const photos = matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo })));
+  const photos = gallery ? matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo }))) : [];
   entries.replaceChildren();
-  $("#journal-title").textContent = stories ? "Trip stories" : "Photo gallery";
+  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline" }[view];
   count.textContent = "";
   for (const control of document.querySelectorAll("[data-view]")) {
     const active = control.dataset.view === view;
@@ -187,11 +236,15 @@ function render() {
   } else if (state === "signed-out") {
     empty.append(element("h3", "Sign in to view your journal"));
   } else {
-    const length = stories ? matching.length : photos.length;
-    count.textContent = length + (stories ? " trip" : " photo") + (length === 1 ? "" : "s");
+    const length = gallery ? photos.length : matching.length;
+    count.textContent = length + (gallery ? " photo" : " trip") + (length === 1 ? "" : "s");
+    if (length && view === "timeline") {
+      entries.append(timeline(matching));
+      return;
+    }
     if (length) {
-      const grid = element("div", "", stories ? "cards" : "gallery");
-      if (stories) grid.append(...matching.map(tripCard));
+      const grid = element("div", "", gallery ? "gallery" : "cards");
+      if (!gallery) grid.append(...matching.map(tripCard));
       else grid.append(...photos.map(({ trip, photo }) => {
         const tile = button("", "gallery-tile", event => openPhotos(trip, photo.key, event.currentTarget));
         tile.append(image(photo, trip), element("span", trip.destination));
@@ -212,11 +265,11 @@ function render() {
       entries.append(empty);
       return;
     }
-    const icon = element("span", stories ? "✎" : "▧", "empty-icon");
+    const icon = element("span", gallery ? "▧" : "✎", "empty-icon");
     icon.setAttribute("aria-hidden", "true");
-    empty.append(icon, element("h3", stories ? "Your story starts here" : "Your gallery is empty"),
-      element("p", stories ? "Pick a trip you’d like to remember and give it a page." : "Photos you add to a trip will appear here."),
-      button(stories ? "Add your first trip" : "Add a trip", "secondary", () => openComposer()));
+    empty.append(icon, element("h3", gallery ? "Your gallery is empty" : "Your story starts here"),
+      element("p", gallery ? "Photos you add to a trip will appear here." : "Pick a trip you’d like to remember and give it a page."),
+      button(gallery ? "Add a trip" : "Add your first trip", "secondary", () => openComposer()));
   }
   entries.append(empty);
 }
@@ -520,8 +573,7 @@ form.addEventListener("submit", async event => {
     clearFiles();
     editingTrip = null;
     if (trip) {
-      setTrips(trips.map(item => item.id === result.id ? result : item)
-        .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)));
+      setTrips(trips.map(item => item.id === result.id ? result : item));
       render();
       showDetail(result, draftCleanupFailed ? "Trip updated. The browser could not clear its draft." : "Trip updated.");
       detail.querySelector("[data-close]").focus();
@@ -529,7 +581,7 @@ form.addEventListener("submit", async event => {
     }
     await load();
     if (state !== "ready") {
-      setTrips([result, ...trips.filter(item => item.id !== result.id)].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)));
+      setTrips([result, ...trips.filter(item => item.id !== result.id)]);
       state = "ready";
     }
     changeView("stories");
