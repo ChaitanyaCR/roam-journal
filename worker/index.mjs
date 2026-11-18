@@ -32,7 +32,9 @@ function trip(row) {
 async function listTrips(db, owner) {
   const query = db.prepare(`SELECT ${tripColumns} FROM trips WHERE owner = ? ORDER BY date DESC, id DESC`);
   const { results } = await query.bind(owner).all();
-  return json(results.map(trip));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
+  const scope = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  return Response.json(results.map(trip), { headers: { ...headers, "X-Roam-Draft-Scope": scope } });
 }
 
 function editConflict() {

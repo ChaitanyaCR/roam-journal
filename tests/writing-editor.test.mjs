@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Window } from "happy-dom";
 import { readFile } from "node:fs/promises";
+import { indexedDB } from "fake-indexeddb";
 
 const window = new Window({ url: "http://localhost" });
 for (const name of ["window", "document", "navigator", "Node", "HTMLElement", "Element", "MutationObserver", "DOMParser", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame"]) {
@@ -12,6 +13,16 @@ for (const name of ["window", "document", "navigator", "Node", "HTMLElement", "E
 }
 const { createWritingEditor } = await import("../src/writing-editor.js");
 const { layoutStoryPhotos, renderStory } = await import("../src/story-renderer.js");
+const { createPhotoViewer } = await import("../src/photo-viewer.js");
+const { readDraft, saveDraft, clearDraft } = await import("../src/trip-drafts.js");
+
+async function waitFor(check) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (check()) return;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.ok(check(), "Expected UI state was not reached");
+}
 
 function setup(t, trip) {
   const element = document.createElement("div");
@@ -94,6 +105,50 @@ test("reading layout marks panoramas using the loaded photo proportions", () => 
   panorama.dispatchEvent(new window.Event("load"));
   assert.ok(panorama.parentElement.hasAttribute("data-panorama"));
   assert.ok(!portrait.parentElement.hasAttribute("data-panorama"));
+});
+
+test("the viewer follows story order and supports keyboard and swipe navigation", async () => {
+  const html = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
+  document.body.innerHTML = html.match(/<dialog id="photo-viewer"[\s\S]*?<\/dialog>/)[0];
+  const dialog = document.querySelector("#photo-viewer");
+  const first = crypto.randomUUID();
+  const second = crypto.randomUUID();
+  const open = createPhotoViewer(dialog, () => {});
+  open({
+    title: "Goa", photos: [{ key: first }, { key: second }],
+    document: { type: "doc", content: [
+      { type: "image", attrs: { index: 1, caption: "First in the story" } },
+      { type: "image", attrs: { index: 0, caption: "Second in the story" } },
+    ] },
+  }, second);
+  assert.equal(dialog.open, true);
+  assert.equal(dialog.querySelector("figcaption").textContent, "First in the story");
+  assert.ok(dialog.querySelector('[data-photo-step="-1"]').disabled);
+  dialog.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  assert.equal(dialog.querySelector("img").getAttribute("src"), "/api/photos/" + first);
+  assert.equal(dialog.querySelector("#photo-position").textContent, "2 of 2");
+  const stage = dialog.querySelector(".photo-stage");
+  const start = new window.Event("touchstart");
+  const end = new window.Event("touchend");
+  Object.defineProperty(start, "touches", { value: [{ clientX: 20, clientY: 10 }] });
+  Object.defineProperty(end, "changedTouches", { value: [{ clientX: 100, clientY: 12 }] });
+  stage.dispatchEvent(start);
+  stage.dispatchEvent(end);
+  assert.equal(dialog.querySelector("#photo-position").textContent, "1 of 2");
+  dialog.querySelector("[data-photo-close]").click();
+  assert.equal(dialog.open, false);
+});
+
+test("one tab cannot replace or clear a newer draft from another tab", async () => {
+  globalThis.indexedDB = indexedDB;
+  const key = "other-account:new";
+  assert.equal(await saveDraft(key, { stamp: "earlier" }), true);
+  assert.equal(await saveDraft(key, { stamp: "later" }, "earlier"), true);
+  assert.equal(await saveDraft(key, { stamp: "stale" }, "earlier"), false);
+  await clearDraft(key, "earlier");
+  assert.equal((await readDraft(key)).stamp, "later");
+  await clearDraft(key, "later");
+  assert.equal(await readDraft(key), undefined);
 });
 
 test("formatting works and photos from pasted HTML are excluded", t => {
@@ -186,6 +241,7 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   const originalFetch = globalThis.fetch;
   const originalFormData = globalThis.FormData;
   globalThis.FormData = window.FormData;
+  globalThis.indexedDB = indexedDB;
   window.HTMLElement.prototype.scrollIntoView = () => {};
   let failed = false;
   let saved;
@@ -214,34 +270,51 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
       };
       return Response.json(saved);
     }
-    return Response.json(saved ? [saved] : []);
+    return Response.json(saved ? [saved] : [], { headers: { "X-Roam-Draft-Scope": "account-one" } });
   };
   t.after(() => { globalThis.fetch = originalFetch; globalThis.FormData = originalFormData; });
   await import("../src/journal.js");
   await new Promise(resolve => setTimeout(resolve, 0));
   document.querySelector("[data-add]").click();
+  await waitFor(() => document.querySelector("#composer").open);
   const form = document.querySelector("#trip-form");
   form.elements.namedItem("title").value = "My memory";
   form.elements.namedItem("destination").value = "Goa";
   const editor = document.querySelector("#writing-editor .tiptap").editor;
   editor.commands.setContent("<p>A <strong>memory</strong></p>");
+  const picker = document.querySelector("#files");
+  Object.defineProperty(picker, "files", { value: [photo()] });
+  picker.dispatchEvent(new window.Event("change"));
+  document.querySelector("#composer [data-close]").click();
+  await waitFor(() => !document.querySelector("#composer").open);
+  const draft = await readDraft("account-one:new");
+  assert.equal(draft.fields.title, "My memory");
+  assert.equal(draft.uploads[0].name, "beach.png");
+  document.querySelector("[data-add]").click();
+  await waitFor(() => document.querySelector("#composer").open);
+  assert.equal(document.querySelector("#form-title").textContent, "Resume draft");
+  assert.match(document.querySelector("#writing-editor figure img").getAttribute("src"), /^blob:/);
+  document.querySelector("#writing-editor .photo-remove").click();
+  const resumed = document.querySelector("#writing-editor .tiptap").editor;
   document.querySelector("#preview-toggle").click();
   assert.equal(document.querySelector("#composer-preview strong").textContent, "memory");
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitFor(() => !document.querySelector("#form-error").hidden);
   assert.match(document.querySelector("#form-error").textContent, /Temporary save failure/);
-  assert.equal(editor.isEditable, true);
-  assert.equal(editor.getText(), "A memory");
+  assert.equal(resumed.isEditable, true);
+  assert.equal(resumed.getText().trim(), "A memory");
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitFor(() => !document.querySelector("#notice").hidden);
   assert.equal(submittedIds.length, 2);
   assert.equal(submittedIds[0], submittedIds[1]);
   assert.equal(document.querySelector("#composer").open, false);
   assert.equal(document.querySelector("#notice").textContent, "Trip saved.");
+  assert.equal(await readDraft("account-one:new"), undefined);
   document.querySelector(".cards .card").click();
   assert.equal(document.querySelector("#detail-content .rich-story strong").textContent, "memory");
 
   document.querySelector(".detail-meta button").click();
+  await waitFor(() => document.querySelector("#composer").open);
   assert.equal(document.querySelector("#form-title").textContent, "Edit trip");
   assert.equal(document.querySelector("#save").textContent, "Save changes");
   assert.equal(form.elements.namedItem("title").value, "My memory");
@@ -252,11 +325,11 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   form.elements.namedItem("title").value = "Updated memory";
   reopened.commands.setContent("<p>An <em>updated</em> memory</p>");
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitFor(() => !document.querySelector("#form-error").hidden);
   assert.match(document.querySelector("#form-error").textContent, /Temporary update failure/);
   assert.equal(reopened.getText(), "An updated memory");
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitFor(() => !document.querySelector("#composer").open);
   assert.equal(editIds.length, 2);
   assert.equal(editIds[0], editIds[1]);
   assert.equal(document.querySelector("#composer").open, false);

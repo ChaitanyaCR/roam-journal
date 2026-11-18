@@ -59,9 +59,22 @@
 </fieldset>
 <article id="composer-preview" class="reading-preview" aria-label="Story preview" hidden></article>
 <p id="form-error" class="error" role="alert" hidden></p>
-<div class="actions"><button class="secondary" type="button" data-close>Cancel</button><button id="preview-toggle" class="secondary" type="button" aria-pressed="false">Preview story</button><button id="save" class="primary">Save trip</button></div>
+<div class="actions">
+<span id="draft-status" role="status"></span>
+<button class="text-button" id="discard-draft" type="button" hidden>Discard draft</button>
+<button class="secondary" type="button" data-close>Close</button><button id="preview-toggle" class="secondary" type="button" aria-pressed="false">Preview story</button><button id="save" class="primary">Save trip</button></div>
 </form></div></dialog>
 <dialog id="detail" class="wide" aria-label="Trip details"><div class="modal-content">
 <button type="button" class="close" aria-label="Close" data-close>×</button><div id="detail-content"></div>
 </div></dialog>
+<dialog id="photo-viewer" aria-labelledby="photo-viewer-title">
+<header><h2 id="photo-viewer-title"></h2><button type="button" data-photo-close aria-label="Close photo viewer">×</button></header>
+<figure class="photo-stage"><img draggable="false" alt=""><figcaption></figcaption></figure>
+<footer>
+<button type="button" data-photo-step="-1" aria-label="Previous photo">←</button>
+<span id="photo-position" role="status"></span>
+<button type="button" data-photo-step="1" aria-label="Next photo">→</button>
+<button type="button" data-photo-story>Read story</button>
+</footer>
+</dialog>
 </body></html>

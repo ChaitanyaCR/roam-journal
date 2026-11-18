@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.8",
     "happy-dom": "^21.0.4",
     "wrangler": "^4.161.0"
   },

@@ -1,5 +1,7 @@
 import { createWritingEditor } from "./writing-editor.js";
 import { layoutStoryPhotos, renderStory } from "./story-renderer.js";
+import { clearDraft, readDraft, saveDraft } from "./trip-drafts.js";
+import { createPhotoViewer } from "./photo-viewer.js";
 
 const $ = selector => document.querySelector(selector);
 const composer = $("#composer");
@@ -7,6 +9,9 @@ const detail = $("#detail");
 const form = $("#trip-form");
 const save = $("#save");
 const addButtons = document.querySelectorAll("[data-add]");
+const openPhotos = createPhotoViewer($("#photo-viewer"), trip => showDetail(trip));
+const draftStatus = $("#draft-status");
+const discard = $("#discard-draft");
 let trips = [];
 let view = "stories";
 let state = "loading";
@@ -16,7 +21,15 @@ let preview = false;
 let insertPosition;
 let requestId;
 let editingTrip = null;
+let baseRevision;
 let busy = false;
+let openingComposer = false;
+let draftScope;
+let draftKey;
+let draftStamp;
+let persistedStamp;
+let draftTimer;
+let draftWrites = Promise.resolve();
 const dateLabel = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
 
 function element(tag, text = "", className = "") {
@@ -41,50 +54,52 @@ function image(photo, trip) {
   return node;
 }
 
-function showDetail(trip, photo, notice) {
+function showDetail(trip, notice) {
   const content = $("#detail-content");
   content.replaceChildren();
-  if (!photo) content.append(element("p", trip.destination, "location"));
+  content.append(element("p", trip.destination, "location"));
   content.append(element("h2", trip.title));
-  if (photo) {
-    const figure = element("figure", "", "story-photo");
-    figure.append(image(photo, trip), element("figcaption", photo.alt || trip.destination));
-    content.append(figure, button("Read story →", "secondary", () => showDetail(trip)));
+  const date = element("time", dateLabel.format(new Date(trip.date)));
+  date.dateTime = trip.date;
+  const story = element("div", "", "story-content");
+  const sections = trip.blocks || [
+    { type: "text", text: trip.story },
+    ...trip.photos.map((_, index) => ({ type: "photo", index })),
+  ];
+  if (trip.document) {
+    story.append(renderStory(trip.document, trip.photos));
   } else {
-    const date = element("time", dateLabel.format(new Date(trip.date)));
-    date.dateTime = trip.date;
-    const story = element("div", "", "story-content");
-    const sections = trip.blocks || [
-      { type: "text", text: trip.story },
-      ...trip.photos.map((_, index) => ({ type: "photo", index })),
-    ];
-    if (trip.document) {
-      story.append(renderStory(trip.document, trip.photos));
-    } else {
-      for (const section of sections) {
-        if (section.type === "text") {
-          if (section.text) story.append(element("p", section.text, "story-text"));
-        } else {
-          const item = trip.photos[section.index];
-          if (!item) continue;
-          const figure = element("figure");
-          figure.append(image(item, trip));
-          if (item.alt) figure.append(element("figcaption", item.alt));
-          story.append(figure);
-        }
+    for (const section of sections) {
+      if (section.type === "text") {
+        if (section.text) story.append(element("p", section.text, "story-text"));
+      } else {
+        const item = trip.photos[section.index];
+        if (!item) continue;
+        const figure = element("figure");
+        figure.dataset.photoKey = item.key;
+        figure.append(image(item, trip));
+        if (item.alt) figure.append(element("figcaption", item.alt));
+        story.append(figure);
       }
-      layoutStoryPhotos(story);
     }
-    const meta = element("div", "", "detail-meta");
-    meta.append(date, button("Edit trip", "secondary", () => openComposer(trip)));
-    content.append(meta);
-    if (notice) {
-      const status = element("p", notice, "notice");
-      status.setAttribute("role", "status");
-      content.append(status);
-    }
-    content.append(story);
+    layoutStoryPhotos(story);
   }
+  for (const figure of story.querySelectorAll("figure[data-photo-key]")) {
+    const photoButton = button("", "story-photo-open", event => openPhotos(trip, figure.dataset.photoKey, event.currentTarget));
+    const photoImage = figure.querySelector("img");
+    photoButton.setAttribute("aria-label", photoImage.alt + " — open photo");
+    photoImage.before(photoButton);
+    photoButton.append(photoImage);
+  }
+  const meta = element("div", "", "detail-meta");
+  meta.append(date, button("Edit trip", "secondary", () => openComposer(trip)));
+  content.append(meta);
+  if (notice) {
+    const status = element("p", notice, "notice");
+    status.setAttribute("role", "status");
+    content.append(status);
+  }
+  content.append(story);
   detail.setAttribute("aria-label", trip.title);
   if (!detail.open) detail.showModal();
   detail.scrollTop = 0;
@@ -115,7 +130,10 @@ function render() {
     control.classList.toggle("active", active);
     control.setAttribute("aria-pressed", String(active));
   }
-  for (const control of addButtons) control.hidden = state === "signed-out";
+  for (const control of addButtons) {
+    control.hidden = state === "signed-out";
+    control.disabled = state === "loading";
+  }
   $("#signin").hidden = state !== "signed-out";
 
   const empty = element("div", "", "empty");
@@ -133,7 +151,7 @@ function render() {
       const grid = element("div", "", stories ? "cards" : "gallery");
       if (stories) grid.append(...trips.map(tripCard));
       else grid.append(...photos.map(({ trip, photo }) => {
-        const tile = button("", "gallery-tile", () => showDetail(trip, photo));
+        const tile = button("", "gallery-tile", event => openPhotos(trip, photo.key, event.currentTarget));
         tile.append(image(photo, trip), element("span", trip.destination));
         return tile;
       }));
@@ -154,10 +172,14 @@ async function load() {
   render();
   try {
     const response = await fetch("/api/trips", { cache: "no-store" });
-    if (response.status === 401) state = "signed-out";
+    if (response.status === 401) {
+      draftScope = undefined;
+      state = "signed-out";
+    }
     else {
       if (!response.ok) throw new Error();
       trips = await response.json();
+      draftScope = response.headers.get("X-Roam-Draft-Scope");
       state = "ready";
     }
   } catch {
@@ -179,6 +201,7 @@ function formError(message = "") {
 }
 
 function clearFiles() {
+  clearTimeout(draftTimer);
   writing?.editor.destroy();
   writing = null;
   $("#writing-editor").replaceChildren();
@@ -202,40 +225,129 @@ function updateToolbar(editor) {
   }
 }
 
-function openComposer(trip = null) {
-  if (busy) return;
+async function openComposer(trip = null) {
+  if (busy || openingComposer || composer.open || state === "loading") return;
+  const key = draftScope && typeof indexedDB !== "undefined" ? `${draftScope}:${trip?.id ?? "new"}` : undefined;
+  let draft;
+  let storageError = false;
+  if (key) {
+    openingComposer = true;
+    try { draft = await readDraft(key); }
+    catch { storageError = true; }
+    finally { openingComposer = false; }
+  }
   form.reset();
   clearFiles();
+  draftKey = key;
+  draftStamp = persistedStamp = draft?.stamp;
   editingTrip = trip;
-  requestId = crypto.randomUUID();
+  baseRevision = draft ? draft.baseRevision : trip?.revision;
+  requestId = draft?.requestId ?? crypto.randomUUID();
   formError();
   $("#notice").hidden = true;
-  $("#form-title").textContent = trip ? "Edit trip" : "New trip";
+  $("#form-title").textContent = trip ? "Edit trip" : draft ? "Resume draft" : "New trip";
   save.textContent = trip ? "Save changes" : "Save trip";
   const today = new Date();
   form.elements.title.value = trip?.title ?? "";
   form.elements.destination.value = trip?.destination ?? "";
   form.elements.date.value = trip?.date ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (draft) {
+    for (const name of ["title", "destination", "date"]) form.elements[name].value = draft.fields[name];
+  }
+  discard.hidden = !draft;
+  const storedTime = draft && new Date(draft.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  draftStatus.textContent = draft ? `Draft restored · Saved at ${storedTime}`
+    : storageError || !key ? "Draft autosave is unavailable." : "";
+  if (draft && trip && (baseRevision ?? null) !== (trip.revision ?? null) && requestId !== trip.revision) {
+    formError("This trip has changed since this draft was saved. You can review or copy your draft here. Discard the draft to edit the latest version.");
+  }
   composer.showModal();
-  writing = createWritingEditor({ element: $("#writing-editor"), trip, onChange: updateToolbar, onError: formError });
+  writing = createWritingEditor({ element: $("#writing-editor"), trip, draft, onChange: updateToolbar, onError: formError });
   writing.editor.on("update", markDirty);
   updateToolbar(writing.editor);
   form.elements.title.focus();
 }
 
-function closeComposer() {
+async function persistDraft() {
+  if (!draftKey || !writing || !dirty) return !dirty;
+  clearTimeout(draftTimer);
+  const stamp = draftStamp;
+  const key = draftKey;
+  const savedAt = Date.now();
+  try {
+    requestId ??= crypto.randomUUID();
+    const fields = Object.fromEntries(["title", "destination", "date"].map(name => [name, form.elements[name].value]));
+    const snapshot = writing.snapshot();
+    const uploads = snapshot.uploads.map(file => ({ blob: file, name: file.name }));
+    const entry = { ...snapshot, uploads, fields, stamp, savedAt, requestId, baseRevision };
+    const queued = draftWrites.then(async () => {
+      if (!writing || draftKey !== key) return false;
+      if (persistedStamp === stamp) return true;
+      const saved = await saveDraft(key, entry, persistedStamp);
+      if (saved) persistedStamp = stamp;
+      return saved;
+    });
+    draftWrites = queued.catch(() => {});
+    if (!await queued) {
+      draftStatus.textContent = "The draft changed in another tab. The latest changes in this tab are unsaved.";
+      return false;
+    }
+    if (draftStamp !== stamp) return false;
+    dirty = false;
+    draftStatus.textContent = "Draft saved at " + new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return true;
+  } catch {
+    draftStatus.textContent = "Draft autosave failed. Keep this tab open or save the trip.";
+    return false;
+  }
+}
+
+async function closeComposer() {
   if (busy) return;
-  const message = editingTrip ? "Discard your unsaved changes?" : "Discard this unsaved trip?";
-  if (dirty && !window.confirm(message)) return;
+  const stamp = draftStamp;
+  if (dirty && !await persistDraft()) {
+    if (busy || stamp !== draftStamp || !composer.open) return;
+    if (!window.confirm("Close without saving your latest changes?")) return;
+  }
+  if (busy || stamp !== draftStamp || !composer.open) return;
   composer.close();
   clearFiles();
   editingTrip = null;
 }
 
 function markDirty() {
+  if (!writing || busy) return;
   dirty = true;
+  draftStamp = crypto.randomUUID();
   if (editingTrip) requestId = null;
+  discard.hidden = !draftKey;
+  if (!draftKey) return;
+  draftStatus.textContent = "Saving draft…";
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => void persistDraft(), 250);
 }
+
+discard.addEventListener("click", async () => {
+  if (busy || !window.confirm("Discard this draft?")) return;
+  const stamp = draftStamp;
+  const trip = editingTrip;
+  await persistDraft();
+  if (stamp !== draftStamp || busy || !composer.open) return;
+  try {
+    if (persistedStamp) await clearDraft(draftKey, persistedStamp);
+    if (stamp !== draftStamp || busy || !composer.open) return;
+    composer.close();
+    clearFiles();
+    editingTrip = null;
+    if (trip) showDetail(trip);
+  } catch {
+    formError("The draft could not be discarded. Try again.");
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) void persistDraft();
+});
 
 form.addEventListener("input", markDirty);
 form.addEventListener("invalid", () => {
@@ -317,7 +429,7 @@ form.addEventListener("submit", async event => {
     data.set("document", JSON.stringify(document));
     uploads.forEach(file => data.append("photos", file));
     if (trip) {
-      data.set("revision", trip.revision ?? "");
+      data.set("revision", baseRevision ?? "");
       data.set("photoKeys", JSON.stringify(photoKeys));
     }
   } catch (failure) {
@@ -332,10 +444,16 @@ form.addEventListener("submit", async event => {
   save.textContent = trip ? "Saving changes…" : "Saving trip…";
   formError();
   try {
+    await persistDraft();
     const path = trip ? `/api/trips/${encodeURIComponent(trip.id)}` : "/api/trips";
     const response = await fetch(path, { method: trip ? "PATCH" : "POST", body: data });
     const result = await response.json().catch(() => null);
     if (!response.ok || !result?.id) throw new Error(result?.message || "The trip could not be saved. Try again.");
+    let draftCleanupFailed = false;
+    if (draftKey && persistedStamp) {
+      try { await clearDraft(draftKey, persistedStamp); }
+      catch { draftCleanupFailed = true; }
+    }
     dirty = false;
     composer.close();
     clearFiles();
@@ -344,7 +462,7 @@ form.addEventListener("submit", async event => {
       trips = trips.map(item => item.id === result.id ? result : item)
         .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
       render();
-      showDetail(result, null, "Trip updated.");
+      showDetail(result, draftCleanupFailed ? "Trip updated. The browser could not clear its draft." : "Trip updated.");
       detail.querySelector("[data-close]").focus();
       return;
     }
@@ -354,7 +472,7 @@ form.addEventListener("submit", async event => {
       state = "ready";
     }
     changeView("stories");
-    $("#notice").textContent = "Trip saved.";
+    $("#notice").textContent = draftCleanupFailed ? "Trip saved. The browser could not clear its draft." : "Trip saved.";
     $("#notice").hidden = false;
   } catch (failure) {
     formError(failure instanceof Error ? failure.message : "The trip could not be saved.");

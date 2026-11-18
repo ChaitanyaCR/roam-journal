@@ -53,6 +53,7 @@ export function renderStory(document, photos) {
       const figure = window.document.createElement("figure");
       const photo = photos[node.attrs.index];
       if (!photo) return figure;
+      figure.dataset.photoKey = photo.key;
       const image = window.document.createElement("img");
       image.src = "/api/photos/" + encodeURIComponent(photo.key);
       image.alt = node.attrs.caption || photo.alt || "Trip photo";

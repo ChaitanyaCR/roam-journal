@@ -22,7 +22,7 @@ After editing `src/` or `worker/`, run `npm run build` in a second terminal, the
 
 `wrangler.local.jsonc` and `scripts/local-worker.mjs` are for local development only. Publish through Sites using the normal build output; do not deploy the local entry point.
 
-Run `npm test` to build and check rich documents, editor interactions, save retries, older entries, input validation, user isolation, and failed-upload cleanup. Failed saves retain the open draft. Closing an unsaved trip asks before discarding it; refreshing or leaving warns about unsaved changes. Drafts are held in the current tab rather than persisted automatically.
+Run `npm test` to build and check rich documents, editor interactions, draft recovery, photo navigation, save retries, older entries, input validation, user isolation, and failed-upload cleanup. The app autosaves new trips and unfinished edits, including pending photos, in the current browser. Open **New trip** or **Edit trip** again to resume. Saving the trip clears the draft. Open a photo in a story or the gallery to browse that trip’s photos by swipe, keyboard, or the on-screen arrows.
 
 ## Writing editor prototype
 

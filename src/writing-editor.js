@@ -72,16 +72,17 @@ const Photo = Image.extend({
   },
 });
 
+function hydrateStory(node, photo) {
+  if (node.type === "image") return photo(node.attrs.index, node.attrs.caption);
+  return { ...node, ...(node.content ? { content: node.content.map(child => hydrateStory(child, photo)) } : {}) };
+}
+
 function savedContent(trip) {
   function photo(index, caption) {
     const { key, alt } = trip.photos[index];
     return { type: "image", attrs: { src: "/api/photos/" + encodeURIComponent(key), photoId: key, caption: caption ?? alt ?? "" } };
   }
-  function hydrate(node) {
-    if (node.type === "image") return photo(node.attrs.index, node.attrs.caption);
-    return { ...node, ...(node.content ? { content: node.content.map(hydrate) } : {}) };
-  }
-  if (trip.document) return hydrate(trip.document);
+  if (trip.document) return hydrateStory(trip.document, photo);
 
   const blocks = trip.blocks ?? [
     { type: "text", text: trip.story },
@@ -92,9 +93,22 @@ function savedContent(trip) {
   return { type: "doc", content };
 }
 
-export function createWritingEditor({ element, trip, onChange = () => {}, onError = () => {} }) {
-  const savedKeys = new Set(trip?.photos.map(photo => photo.key));
+export function createWritingEditor({ element, trip, draft, onChange = () => {}, onError = () => {} }) {
+  const savedKeys = new Set(draft ? draft.photoKeys.filter(Boolean) : trip?.photos.map(photo => photo.key));
   const files = new Map();
+  function registerPhoto(file, caption = "") {
+    const photoId = crypto.randomUUID();
+    const url = URL.createObjectURL(file);
+    files.set(photoId, { file, url });
+    return { type: "image", attrs: { src: url, alt: file.name, photoId, caption } };
+  }
+  let uploadIndex = 0;
+  const restorePhoto = (index, caption) => {
+    const key = draft.photoKeys[index];
+    if (key) return { type: "image", attrs: { src: "/api/photos/" + encodeURIComponent(key), photoId: key, caption } };
+    const { blob, name } = draft.uploads[uploadIndex++];
+    return registerPhoto(new File([blob], name, { type: blob.type }), caption);
+  };
   let disposed = false;
   const activePhotos = () => {
     const photos = [];
@@ -113,12 +127,7 @@ export function createWritingEditor({ element, trip, onChange = () => {}, onErro
       onError("Choose up to 12 JPG, PNG, or WebP photos, up to 8 MB each and 28 MB total.");
       return false;
     }
-    const content = incoming.map(file => {
-      const photoId = crypto.randomUUID();
-      const url = URL.createObjectURL(file);
-      files.set(photoId, { file, url });
-      return { type: "image", attrs: { src: url, alt: file.name, photoId, caption: "" } };
-    });
+    const content = incoming.map(file => registerPhoto(file));
     content.push({ type: "paragraph" });
     editor.view.dispatch(closeHistory(editor.state.tr));
     const inserted = editor.chain().focus().insertContentAt(position, content).run();
@@ -145,7 +154,7 @@ export function createWritingEditor({ element, trip, onChange = () => {}, onErro
     editorProps: {
       attributes: { class: "writing-editor", role: "textbox", "aria-label": "Your trip story", "aria-multiline": "true", spellcheck: "true" },
     },
-    content: trip ? savedContent(trip) : "<p></p>",
+    content: draft ? hydrateStory(draft.document, restorePhoto) : trip ? savedContent(trip) : "<p></p>",
     onTransaction: ({ editor }) => onChange(editor),
     onDestroy: () => {
       disposed = true;
@@ -154,7 +163,7 @@ export function createWritingEditor({ element, trip, onChange = () => {}, onErro
       files.clear();
     },
   });
-  function submission() {
+  function snapshot() {
     const uploads = [];
     const photoKeys = [];
     function serialize(node) {
@@ -172,8 +181,11 @@ export function createWritingEditor({ element, trip, onChange = () => {}, onErro
       }
       return { ...node, ...(node.content ? { content: node.content.map(serialize) } : {}) };
     }
-    const document = normalizeDocument({ ...serialize(editor.getJSON()), version: 1 }, photoKeys.length);
-    return { document, uploads, photoKeys };
+    return { document: { ...serialize(editor.getJSON()), version: 1 }, uploads, photoKeys };
   }
-  return { editor, insertPhotos, submission, photoCount: () => activePhotos().length };
+  function submission() {
+    const draft = snapshot();
+    return { ...draft, document: normalizeDocument(draft.document, draft.photoKeys.length) };
+  }
+  return { editor, insertPhotos, snapshot, submission, photoCount: () => activePhotos().length };
 }
