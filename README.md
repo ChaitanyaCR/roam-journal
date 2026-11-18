@@ -6,6 +6,12 @@ New trip opens a full-screen Tiptap editor with continuous writing, bold/italic/
 
 Run `npm run build` to produce the Worker at `dist/server/index.js`. Schema migrations are in `drizzle/`. The deployment requires the DB and BUCKET bindings declared in `.openai/hosting.json`.
 
+## Browsing your journal
+
+Stories, Gallery and Timeline share the same search, year and tag filters. Search matches titles, destinations, story text and photo captions. Add comma-separated tags in the trip editor. Timeline shows trips newest first, with stories from the same date stacked under one milestone.
+
+Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
+
 See the [phase specifications](specification/README.md) for the roadmap, implementation status, and acceptance checks for each phase.
 
 ## Local development
@@ -24,7 +30,7 @@ After editing `src/` or `worker/`, run `npm run build` in a second terminal, the
 
 `wrangler.local.jsonc` and `scripts/local-worker.mjs` are for local development only. Publish through Sites using the normal build output; do not deploy the local entry point.
 
-Run `npm test` to build and check rich documents, editor interactions, draft recovery, photo navigation, save retries, older entries, input validation, user isolation, and failed-upload cleanup. The app autosaves new trips and unfinished edits, including pending photos, in the current browser. Open **New trip** or **Edit trip** again to resume. Saving the trip clears the draft. Open a photo in a story or the gallery to browse that trip’s photos by swipe, keyboard, or the on-screen arrows.
+Run `npm test` to build and check rich documents, editor interactions, draft recovery, photo navigation, save retries, older entries, input validation, user isolation, failed-upload cleanup, shared filters, Timeline grouping, and Trash and restore. The app autosaves new trips and unfinished edits, including pending photos, in the current browser. Open **New trip** or **Edit trip** again to resume. Saving the trip clears the draft. Open a photo in a story or the gallery to browse that trip’s photos by swipe, keyboard, or the on-screen arrows.
 
 ## Writing editor prototype
 

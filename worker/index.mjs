@@ -3,7 +3,7 @@ import { normalizeDocument, documentText } from "../shared/story-document.mjs";
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 const MB = 1024 * 1024;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags";
+const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags, deleted_at";
 const photoLimit = "Choose up to 12 JPG, PNG, or WebP photos, up to 8 MB each and 28 MB total.";
 const formats = {
   "image/jpeg": b => b[0] === 255 && b[1] === 216 && b[2] === 255,
@@ -29,8 +29,9 @@ function trip(row) {
   return { ...row, tags: JSON.parse(row.tags), photos, blocks, document: row.document ? JSON.parse(row.document) : null };
 }
 
-async function listTrips(db, owner) {
-  const query = db.prepare(`SELECT ${tripColumns} FROM trips WHERE owner = ? ORDER BY date DESC, id DESC`);
+async function listTrips(db, owner, includeTrash) {
+  const filter = includeTrash ? "" : " AND deleted_at IS NULL";
+  const query = db.prepare(`SELECT ${tripColumns} FROM trips WHERE owner = ?${filter} ORDER BY date DESC, id DESC`);
   const { results } = await query.bind(owner).all();
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
   const scope = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
@@ -41,14 +42,30 @@ function editConflict() {
   return error("This trip was updated in another session. Copy any changes you want to keep, then refresh the journal for the latest version.", 409);
 }
 
+async function changeTrash(request, db, owner, id, restore) {
+  const data = await request.json().catch(() => null);
+  if (typeof data?.requestId !== "string" || !uuid.test(data.requestId) || data.requestId === data.revision ||
+      (data.revision !== null && (typeof data.revision !== "string" || !uuid.test(data.revision)))) {
+    return error("The trip revision could not be read.", 400);
+  }
+  const condition = restore ? "deleted_at IS NOT NULL" : "deleted_at IS NULL";
+  const row = await db.prepare(`UPDATE trips SET deleted_at = ?, revision = ?
+    WHERE owner = ? AND id = ? AND revision IS ? AND ${condition} RETURNING ${tripColumns}`)
+    .bind(restore ? null : new Date().toISOString(), data.requestId, owner, id, data.revision).first();
+  if (row) return json(trip(row));
+
+  const existing = await db.prepare(`SELECT ${tripColumns} FROM trips WHERE owner = ? AND id = ?`).bind(owner, id).first();
+  if (!existing) return error("Trip not found.", 404);
+  if (existing.revision === data.requestId && (existing.deleted_at === null) === restore) return json(trip(existing));
+  return editConflict();
+}
+
 async function deletePhotos(bucket, photos, keep) {
   const keptKeys = new Set(keep.map(photo => photo.key));
   if (bucket) await Promise.allSettled(photos.filter(photo => !keptKeys.has(photo.key)).map(photo => bucket.delete(photo.key)));
 }
 
 async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = null) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return error("Invalid request origin.", 403);
   if (Number(request.headers.get("content-length")) > 29 * MB) {
     return error("Keep the combined photo size under 28 MB.", 413);
   }
@@ -87,6 +104,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     }
     const existing = await lookup();
     if (!existing) return error("Trip not found.", 404);
+    if (existing.deleted_at) return editConflict();
     if (existing.revision === revision) return json(trip(existing));
     if (existing.revision !== expectedRevision) return editConflict();
     if (!data.has("tags")) tags.push(...JSON.parse(existing.tags));
@@ -140,6 +158,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
 
   if (!tripId) {
     const existing = await lookup();
+    if (existing?.deleted_at) return editConflict();
     if (existing) return json(trip(existing));
   }
 
@@ -188,7 +207,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     const values = [title, destination, date, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
     writeAttempted = true;
     if (tripId) {
-      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ?")
+      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ? AND deleted_at IS NULL")
         .bind(...values, revision, owner, id, expectedRevision).run();
       if (!update.meta.changes) {
         conflict = true;
@@ -202,6 +221,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     const saved = writeAttempted ? await lookup().catch(() => undefined) : undefined;
     const savedTrip = saved ? trip(saved) : null;
     if (!writeAttempted || saved !== undefined || conflict) await deletePhotos(bucket, uploaded, savedTrip?.photos ?? []);
+    if (savedTrip?.deleted_at) return editConflict();
     if (savedTrip && (!tripId || savedTrip.revision === revision)) {
       if (tripId) await deletePhotos(bucket, existingPhotos, savedTrip.photos);
       return json(savedTrip);
@@ -233,10 +253,18 @@ export default {
 
     const owner = request.headers.get("oai-authenticated-user-id");
     if (!owner) return error("Sign in to open your journal.", 401);
+    const origin = request.headers.get("origin");
+    if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) return error("Invalid request origin.", 403);
     try {
+      const action = path.match(/^\/api\/trips\/([^/]+)\/(trash|restore)$/);
+      if (action && request.method === "POST") {
+        if (!uuid.test(action[1])) return error("Trip not found.", 404);
+        if (!env.DB) return error("Journal storage is temporarily unavailable.", 503);
+        return await changeTrash(request, env.DB, owner, action[1], action[2] === "restore");
+      }
       if (path === "/api/trips") {
         if (!env.DB) return error("Journal storage is temporarily unavailable.", 503);
-        if (request.method === "GET") return await listTrips(env.DB, owner);
+        if (request.method === "GET") return await listTrips(env.DB, owner, new URL(request.url).searchParams.get("include") === "trash");
         if (request.method === "POST") return await saveTrip(request, env, owner);
         return new Response(null, { status: 405, headers: { ...headers, Allow: "GET, POST" } });
       }

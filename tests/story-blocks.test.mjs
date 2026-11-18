@@ -219,3 +219,58 @@ test("editing an existing trip keeps its ID, reuses retained photos, and rejects
   assert.deepEqual(rows[0].document, updated.document);
   assert.equal(rows[0].revision, updated.revision);
 });
+
+test("trash and restore preserve the entire trip and reject stale and cross-account requests", async t => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { readdir, readFile } = await import("node:fs/promises");
+  const sqlite = new DatabaseSync(":memory:");
+  t.after(() => sqlite.close());
+  const migrations = new URL("../drizzle/", import.meta.url);
+  for (const name of (await readdir(migrations)).filter(name => name.endsWith(".sql")).sort()) {
+    sqlite.exec(await readFile(new URL(name, migrations), "utf8"));
+  }
+  const env = storage();
+  env.DB = { prepare(sql) {
+    const stmt = sqlite.prepare(sql);
+    return { bind(...args) { return {
+      first: () => stmt.get(...args) ?? null,
+      all: () => ({ results: stmt.all(...args) }),
+      run: () => ({ meta: stmt.run(...args) }),
+    }; } };
+  } };
+  const data = form(undefined, 1);
+  const paragraph = text => ({ type: "paragraph", content: [{ type: "text", text }] });
+  data.set("document", JSON.stringify({ type: "doc", version: 1, content: [
+    paragraph("Arrival"), { type: "image", attrs: { index: 0, caption: "At the station" } }, paragraph("Home"),
+  ] }));
+  data.set("tags", "Family, travel");
+  const saved = await (await worker.fetch(request("POST", data), env)).json();
+  const path = "/api/trips/" + saved.id;
+  const move = (action, revision, requestId, owner) => worker.fetch(request("POST",
+    JSON.stringify({ requestId, revision }), owner, path + "/" + action), env);
+  const list = async (owner, query = "") => (await worker.fetch(request("GET", undefined, owner, "/api/trips" + query), env)).json();
+  const deletion = crypto.randomUUID();
+  assert.equal((await move("trash", null, deletion)).status, 200);
+  assert.equal((await move("trash", null, deletion)).status, 200);
+  assert.deepEqual(await list(), []);
+  const [trashed] = await list("alice", "?include=trash");
+  assert.ok(trashed.deleted_at);
+  assert.equal(trashed.revision, deletion);
+  assert.deepEqual(await list("bob", "?include=trash"), []);
+  assert.equal((await move("restore", deletion, crypto.randomUUID(), "bob")).status, 404);
+  assert.equal((await worker.fetch(request("POST", data), env)).status, 409);
+  const stale = form();
+  stale.set("document", data.get("document"));
+  stale.set("revision", "");
+  stale.set("photoKeys", JSON.stringify([saved.photos[0].key]));
+  assert.equal((await worker.fetch(request("PATCH", stale, "alice", path), env)).status, 409);
+  const restoration = crypto.randomUUID();
+  assert.equal((await move("restore", deletion, restoration)).status, 200);
+  assert.equal((await move("restore", deletion, restoration)).status, 200);
+  assert.equal((await move("trash", null, deletion)).status, 409);
+  assert.equal((await worker.fetch(request("PATCH", stale, "alice", path), env)).status, 409);
+  const [restored] = await list();
+  assert.deepEqual(restored, { ...saved, deleted_at: null, revision: restoration });
+  const photo = await worker.fetch(request("GET", undefined, "alice", "/api/photos/" + saved.photos[0].key), env);
+  assert.deepEqual(Buffer.from(await photo.arrayBuffer()), png);
+});

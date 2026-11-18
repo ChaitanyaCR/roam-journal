@@ -66,6 +66,46 @@ function image(photo, trip) {
   return node;
 }
 
+function trashButton(trip) {
+  const restore = Boolean(trip.deleted_at);
+  const requestId = crypto.randomUUID();
+  const control = button(restore ? "Restore trip" : "Move to Trash", "secondary", async () => {
+    if (busy) return;
+    busy = true;
+    control.disabled = true;
+    try {
+      const action = restore ? "restore" : "trash";
+      const response = await fetch(`/api/trips/${encodeURIComponent(trip.id)}/${action}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, revision: trip.revision ?? null }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "The trip could not be updated.");
+      setTrips(trips.map(item => item.id === result.id ? result : item));
+      if (control.isConnected && detail.open) detail.close();
+      render();
+      $("#notice").textContent = restore ? "Trip restored." : "Trip moved to Trash.";
+      $("#notice").hidden = false;
+    } catch (failure) {
+      if (control.isConnected && detail.open) showDetailError(control, failure.message || "Try again.");
+    } finally {
+      busy = false;
+      control.disabled = false;
+    }
+  });
+  return control;
+}
+
+function showDetailError(control, message) {
+  let alert = $("#detail-content [role=alert]");
+  if (!alert) {
+    alert = element("p", "", "error");
+    alert.setAttribute("role", "alert");
+    control.parentElement.after(alert);
+  }
+  alert.textContent = message;
+}
+
 function showDetail(trip, notice) {
   const content = $("#detail-content");
   content.replaceChildren();
@@ -103,7 +143,9 @@ function showDetail(trip, notice) {
     photoButton.append(photoImage);
   }
   const meta = element("div", "", "detail-meta");
-  meta.append(date, button("Edit trip", "secondary", () => openComposer(trip)));
+  meta.append(date);
+  if (!trip.deleted_at) meta.append(button("Edit trip", "secondary", () => openComposer(trip)));
+  meta.append(trashButton(trip));
   content.append(meta);
   if (trip.tags?.length) content.append(element("p", trip.tags.join(" · "), "trip-tags"));
   if (notice) {
@@ -143,6 +185,7 @@ function setTrips(next) {
   const years = new Set();
   const tags = new Map();
   for (const trip of trips) {
+    if (trip.deleted_at) continue;
     years.add(trip.date.slice(0, 4));
     for (const tag of trip.tags ?? []) {
       const key = tag.toLowerCase();
@@ -155,6 +198,7 @@ function setTrips(next) {
 
 function filteredTrips(query, year, tag) {
   return trips.filter(trip => {
+    if (trip.deleted_at) return false;
     if (year && trip.date.slice(0, 4) !== year) return false;
     if (tag && !trip.tags?.some(value => value.toLowerCase() === tag)) return false;
     return !query || [trip.title, trip.destination, trip.story, ...trip.photos.map(photo => photo.alt)]
@@ -209,12 +253,13 @@ function render() {
   const entries = $("#entries");
   const count = $("#count");
   const gallery = view === "gallery";
-  $("#trip-filters").hidden = state !== "ready";
+  const trash = view === "trash";
+  $("#trip-filters").hidden = state !== "ready" || trash;
   const query = search.value.trim().toLowerCase();
-  const matching = filteredTrips(query, yearFilter.value, tagFilter.value);
+  const matching = trash ? trips.filter(trip => trip.deleted_at) : filteredTrips(query, yearFilter.value, tagFilter.value);
   const photos = gallery ? matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo }))) : [];
   entries.replaceChildren();
-  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline" }[view];
+  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline", trash: "Trash" }[view];
   count.textContent = "";
   for (const control of document.querySelectorAll("[data-view]")) {
     const active = control.dataset.view === view;
@@ -253,6 +298,11 @@ function render() {
       entries.append(grid);
       return;
     }
+    if (trash) {
+      empty.append(element("h3", "Trash is empty"));
+      entries.append(empty);
+      return;
+    }
     if (query || yearFilter.value || tagFilter.value) {
       empty.append(element("h3", matching.length ? "Matching trips have no photos" : "No matching trips"),
         button("Clear filters", "secondary", () => {
@@ -282,7 +332,7 @@ async function load() {
   state = "loading";
   render();
   try {
-    const response = await fetch("/api/trips", { cache: "no-store" });
+    const response = await fetch("/api/trips?include=trash", { cache: "no-store" });
     if (response.status === 401) {
       draftScope = undefined;
       state = "signed-out";

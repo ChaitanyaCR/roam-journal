@@ -1,12 +1,12 @@
 # Phase 3 · Multi-day trips and World Map
 
-**Status** Planned. Depends on Phase 2’s shared filters, Timeline and Trash behavior.
+**Status** Next phase. Start with multi-day writing, then add World Map. Shared filters, daily Timeline milestones and Trash are implemented.
 
 ## Multi-day writing
 
 Keep the existing trip date as the start date and add an optional inclusive end date. Let the writer add dated sections to one trip and place text, formatting, photos and captions inside each section. A single-day trip still saves with its existing workflow. Preserve undated story content when the author adds a section.
 
-Use calendar dates consistently across the editor, Timeline and reader. Reject an end before the start and flag sections outside the trip range before saving. Show the range in trip detail and Timeline. A trip crossing New Year appears once under its start year and month.
+Use calendar dates consistently across the editor, Timeline and reader. Reject an end before the start and flag sections outside the trip range before saving. Show the range in trip detail and Timeline. A trip crossing New Year appears once under its start date’s Timeline milestone. Trips with the same start date share that milestone, even when their end dates differ.
 
 **Proposed implementation** Add an optional D1 end date and extend the versioned story format for dated sections. Update document validation, legacy conversion, editing, draft recovery, reading, photo traversal and search together. Keep the previous document version readable.
 

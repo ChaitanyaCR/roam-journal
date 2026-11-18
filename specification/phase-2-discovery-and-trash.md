@@ -1,6 +1,6 @@
 # Phase 2 · Search, tags, Timeline and Trash
 
-**Status** In progress. Stories, Gallery and Timeline share search, year and tag filters. Trash and restore are next.
+**Status** Implemented. Stories, Gallery and Timeline share search, year and tag filters. Trips can be moved to Trash and restored.
 
 ## Delivery order
 
@@ -9,17 +9,21 @@
 3. **Timeline.** Add Timeline as a peer to Stories and Gallery in the main navigation. Group trips by year and month, newest first, with a year picker. Each entry shows its date, title and destination and opens the existing trip detail. Use the current trip date as the start. When Phase 3 supplies an end date, display the range and anchor the trip once under its start month and year.
 4. **Trash and restore.** Add a move-to-Trash action and a Trash view with restore. Hide trashed trips from ordinary browsing and search. Retain their stories and R2 photos so restoration returns the complete trip. Permanent deletion and retention periods require a separate product decision.
 
-## Proposed implementation
-
-Use a migration for tags and a nullable deletion timestamp. Extend the existing trip serializer, form and revision checks. Make trash and restore owner-scoped, revision-checked operations. Prevent a stale editor or recovered draft from moving an entry out of Trash by saving. Start with filtering the authenticated trip list already loaded by the journal. Use stable trip ID ordering for equal dates. Treat search as case-insensitive and combine search, year and selected tag with AND.
-
 ## Implemented behavior
 
-The editor accepts comma-separated tags and keeps the unfinished field in the local draft. Saving trims whitespace and keeps the first spelling of each case-insensitive tag. Migration 0004 gives older entries an empty tag list. Search keeps its query when switching between Stories and Gallery and matches the saved title, destination, story text and photo captions.
+The editor accepts comma-separated tags and keeps the unfinished field in the local draft. Saving trims whitespace and keeps the first spelling of each case-insensitive tag. Migration 0004 gives older entries an empty tag list. Search is case-insensitive and matches the saved title, destination, story text and photo captions.
 
-Search, year and tag selections apply together and persist when switching views. Year and tag choices come from the full trip list and refresh after saves. Clearing filters from an empty result restores all trips or photos in the current view.
+Search, year and tag selections apply together and persist when switching views. Year and tag choices come from all active trips and refresh after saves. Clearing filters from an empty result restores all trips or photos in the current view.
 
 Timeline groups trips under their start year and month, newest first. Trips with the same date are ordered by descending trip ID. Each entry opens the existing trip detail. Each date has one milestone. Stories from that date stack vertically as cards with a cover image on the left and title on the right. Date groups alternate along a dotted line on desktop and follow a single column on phones. Date ranges will follow in Phase 3.
+
+Open a trip and choose **Move to Trash** to remove it from all three browsing views and search. Open the trip in **Trash** and choose **Restore trip** to return it to the journal. Both actions check ownership and revision. Migration 0005 stores the deletion timestamp and keeps existing entries active.
+
+### Storage and verification
+
+`GET /api/trips` returns the owner’s active trips. The journal requests `GET /api/trips?include=trash` to populate the Trash view as well. Moving and restoring a trip use `POST /api/trips/{id}/trash` and `POST /api/trips/{id}/restore`. Each request carries the expected revision and a request ID so a retry after a lost response is safe.
+
+The Worker tests cover stale edits, cross-account access, retries and original photo bytes after restoration. The journal interaction tests cover moving a trip, reopening the journal and restoring it through Trash. A local Wrangler check also exercised the round trip with D1 and R2.
 
 ## Acceptance checks
 

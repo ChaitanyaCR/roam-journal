@@ -427,3 +427,46 @@ test("Timeline groups trips by start month and shares its selection with Stories
   document.querySelector(".empty button").click();
   assert.equal(document.querySelectorAll(".timeline-trip").length, 4);
 });
+
+test("move a trip from its detail to Trash and restore it after reopening the journal", async t => {
+  const html = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let trip = { id: "trip", title: "Coastal walk", destination: "Goa", date: "2025-03-02", story: "Beach", tags: ["Coast"],
+    revision: null, photos: [{ key: "coast", alt: "Sunset" }] };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/trips?include=trash") return Response.json([trip]);
+    assert.equal(options.method, "POST");
+    assert.equal(url, "/api/trips/trip/" + (trip.deleted_at ? "restore" : "trash"));
+    const mutation = JSON.parse(options.body);
+    assert.equal(mutation.revision, trip.revision);
+    trip = { ...trip, revision: mutation.requestId, deleted_at: trip.deleted_at ? null : "2026-11-18" };
+    return Response.json(trip);
+  };
+  async function openJournal(session) {
+    document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
+    await import("../src/journal.js?trash=" + session);
+    await waitFor(() => !document.querySelector("#trip-filters").hidden);
+  }
+  const view = name => document.querySelector(`[data-view="${name}"]`).click();
+  const detailAction = () => document.querySelector(".detail-meta button:last-child");
+  await openJournal("first");
+  document.querySelector(".card").click();
+  assert.equal(detailAction().textContent, "Move to Trash");
+  detailAction().click();
+  await waitFor(() => !document.querySelector("#detail").open);
+  await openJournal("second");
+  for (const name of ["stories", "gallery", "timeline"]) {
+    view(name);
+    assert.equal(document.querySelector("#entries .empty") !== null, true);
+  }
+  view("trash");
+  document.querySelector(".card").click();
+  assert.equal(detailAction().textContent, "Restore trip");
+  assert.equal(document.querySelectorAll(".detail-meta button").length, 1);
+  detailAction().click();
+  await waitFor(() => !document.querySelector("#detail").open);
+  assert.match(document.querySelector("#entries").textContent, /Trash is empty/);
+  view("gallery");
+  assert.equal(document.querySelector(".gallery-tile img").alt, "Sunset");
+});
