@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content">
+<title>Writing editor preview · Roam Journal</title>
+<link rel="icon" href="/roam.svg">
+<link rel="stylesheet" href="/journal.css">
+<link rel="stylesheet" href="/editor-prototype.css">
+<script type="module" src="/editor-prototype.js"></script>
+</head>
+<body class="writing-page">
+<header class="writing-header">
+<a href="/" class="back-link">← Journal</a>
+<span class="preview-badge">Editor preview</span>
+<button id="preview-toggle" type="button" class="secondary" aria-pressed="false">Preview story</button>
+</header>
+<main class="writing-main">
+<p class="preview-note">Try writing with photos. This preview is not saved to your journal; refreshing or leaving discards it.</p>
+<div id="writing-fields">
+<label class="title-label">Trip title<input id="draft-title" maxlength="100" placeholder="Give this memory a title…" autocomplete="off"></label>
+<div class="writing-meta">
+<label>Destination<input id="draft-destination" maxlength="100" placeholder="Where did you go?"></label>
+<label>Trip date<input id="draft-date" type="date"></label>
+</div>
+</div>
+<div id="editor-toolbar" class="writing-toolbar" role="group" aria-label="Story formatting">
+<button type="button" data-command="bold" aria-label="Bold" aria-pressed="false" title="Bold (Ctrl/Cmd+B)"><strong>B</strong></button>
+<button type="button" data-command="italic" aria-label="Italic" aria-pressed="false" title="Italic (Ctrl/Cmd+I)"><em>I</em></button>
+<button type="button" data-command="heading" aria-label="Heading" aria-pressed="false">H2</button>
+<button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false">• List</button>
+<span class="toolbar-divider" aria-hidden="true"></span>
+<button type="button" id="insert-photo" class="photo-button">＋ Photo</button>
+<span class="toolbar-divider" aria-hidden="true"></span>
+<button type="button" data-command="undo" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
+<button type="button" data-command="redo" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+</div>
+<p id="editor-message" class="editor-message" role="status" hidden></p>
+<div id="writing-editor"></div>
+<article id="reading-preview" class="reading-preview" aria-label="Story preview" hidden></article>
+<div class="writing-bottom"><span id="draft-count" role="status">0 characters · 0 photos</span><span id="writing-hint">Drop or paste photos anywhere in your story.</span></div>
+<input id="draft-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden aria-label="Choose photos">
+</main>
+</body>
+</html>
