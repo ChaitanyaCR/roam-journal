@@ -1,4 +1,5 @@
 import { createWritingEditor } from "./writing-editor.js";
+import { layoutStoryPhotos } from "./story-renderer.js";
 
 const $ = selector => document.querySelector(selector);
 const picker = $("#draft-photos");
@@ -71,6 +72,7 @@ $("#preview-toggle").addEventListener("click", () => {
     // This HTML is generated from the restricted editor schema, never raw pasted HTML.
     body.innerHTML = editor.getHTML();
     if (editor.isEmpty) body.textContent = "Your story will appear here.";
+    else layoutStoryPhotos(body);
     reading.replaceChildren(title, meta, body);
   }
   for (const id of ["#writing-fields", "#editor-toolbar", "#writing-editor", "#writing-hint"]) $(id).hidden = preview;

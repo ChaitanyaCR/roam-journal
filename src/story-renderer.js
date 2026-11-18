@@ -1,3 +1,39 @@
+export function layoutStoryPhotos(container) {
+  for (const section of [container, ...container.querySelectorAll("li")]) {
+    let row;
+    let blankLines = [];
+    for (const block of [...section.children]) {
+      const image = block.matches("figure") && block.querySelector("img");
+      if (!image) {
+        // The editor can leave an empty paragraph between photo insertions.
+        if (row && block.matches("p") && !block.textContent.trim()) {
+          blankLines.push(block);
+        } else {
+          row = undefined;
+          blankLines = [];
+        }
+        continue;
+      }
+
+      if (!row) {
+        row = container.ownerDocument.createElement("div");
+        row.className = "photo-row";
+        block.before(row);
+      }
+      for (const line of blankLines) line.remove();
+      blankLines = [];
+
+      block.classList.add("story-photo");
+      row.append(block);
+      const markPanorama = () => {
+        block.toggleAttribute("data-panorama", image.naturalHeight > 0 && image.naturalWidth >= 2 * image.naturalHeight);
+      };
+      if (image.complete) markPanorama();
+      else image.addEventListener("load", markPanorama, { once: true });
+    }
+  }
+}
+
 // Render structured content with DOM methods, without injecting stored HTML.
 export function renderStory(document, photos) {
   const container = window.document.createElement("div");
@@ -35,5 +71,6 @@ export function renderStory(document, photos) {
     return element;
   }
   for (const node of document.content) container.append(render(node));
+  layoutStoryPhotos(container);
   return container;
 }

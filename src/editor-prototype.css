@@ -21,8 +21,28 @@
 .writing-editor h2,.reading-preview h2{font-family:var(--serif);font-size:36px;margin:24px 0 12px;line-height:1.2}
 .writing-editor ul,.reading-preview ul{padding-left:26px}
 .writing-editor p.is-editor-empty:first-child::before{content:attr(data-placeholder);color:#888b7e;float:left;height:0;pointer-events:none}
-.writing-editor figure,.reading-preview figure{margin:24px 0}
-.writing-editor figure>img,.reading-preview figure>img{display:block;width:100%;max-height:65vh;object-fit:contain;border-radius:8px;background:#e8e1d4}
+.writing-editor figure{margin:24px 0}
+.story-photo{min-inline-size:0;margin:0;text-align:center}
+.story-photo>img,.writing-editor figure>img{
+  display:block;
+  inline-size:auto;
+  block-size:auto;
+  max-inline-size:100%;
+  max-block-size:70dvh;
+  margin-inline:auto;
+  border-radius:9px;
+}
+.photo-row{
+  --photo-gap:16px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:var(--photo-gap);
+  margin-block:24px;
+}
+.photo-row>.story-photo{flex:1 1 max(252px,calc((100% - var(--photo-gap)) / 2))}
+.photo-row>[data-panorama]{flex-basis:100%}
+@media(max-width:600px){.story-photo>img,.writing-editor figure>img{max-block-size:none}}
 .writing-editor figure.ProseMirror-selectednode{outline:2px solid var(--clay);outline-offset:5px;border-radius:8px}
 .writing-editor .photo-caption{font-size:14px;text-align:center;border:0;background:transparent;padding:8px;margin-top:4px;min-height:40px;font-weight:400}
 .writing-editor .photo-controls{display:flex;align-items:center;gap:8px}

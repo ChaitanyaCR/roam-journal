@@ -11,6 +11,7 @@ for (const name of ["window", "document", "navigator", "Node", "HTMLElement", "E
   });
 }
 const { createWritingEditor } = await import("../src/writing-editor.js");
+const { layoutStoryPhotos, renderStory } = await import("../src/story-renderer.js");
 
 function setup(t, trip) {
   const element = document.createElement("div");
@@ -65,6 +66,34 @@ test("captions appear in reading output and are escaped as text", t => {
   const preview = document.createElement("div");
   preview.innerHTML = editor.getHTML();
   assert.equal(preview.querySelector("script"), null);
+});
+
+test("reading layout groups adjacent photos and preserves captions and intervening text", () => {
+  const photos = Array.from({ length: 3 }, () => ({ key: crypto.randomUUID() }));
+  const image = (index, caption) => ({ type: "image", attrs: { index, caption } });
+  const story = renderStory({ content: [
+    image(0, "First photo"), { type: "paragraph" }, image(1, "Second photo"),
+    { type: "paragraph", content: [{ type: "text", text: "Later that evening" }] }, image(2, "Third photo"),
+  ] }, photos);
+  const [firstRow, text, secondRow] = story.children;
+  assert.equal(story.children.length, 3);
+  assert.ok(firstRow.matches(".photo-row"));
+  assert.deepEqual([...firstRow.querySelectorAll("figcaption")].map(caption => caption.textContent), ["First photo", "Second photo"]);
+  assert.equal(text.textContent, "Later that evening");
+  assert.equal(secondRow.querySelector("figcaption").textContent, "Third photo");
+});
+
+test("reading layout marks panoramas using the loaded photo proportions", () => {
+  const story = document.createElement("div");
+  story.innerHTML = "<figure><img></figure><figure><img></figure>";
+  const [panorama, portrait] = story.querySelectorAll("img");
+  Object.defineProperties(panorama, { complete: { value: false }, naturalWidth: { value: 1800 }, naturalHeight: { value: 600 } });
+  Object.defineProperties(portrait, { complete: { value: true }, naturalWidth: { value: 600 }, naturalHeight: { value: 900 } });
+  layoutStoryPhotos(story);
+  assert.ok(!panorama.parentElement.hasAttribute("data-panorama"));
+  panorama.dispatchEvent(new window.Event("load"));
+  assert.ok(panorama.parentElement.hasAttribute("data-panorama"));
+  assert.ok(!portrait.parentElement.hasAttribute("data-panorama"));
 });
 
 test("formatting works and photos from pasted HTML are excluded", t => {

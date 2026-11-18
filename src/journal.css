@@ -83,8 +83,6 @@ textarea{resize:vertical}
 .text-button{background:none;border:0;text-decoration:underline;padding:4px 0;color:#87412e;font-size:13px}
 .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 .story-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:22px 0;line-height:1.75}
-.story-photos{display:grid;gap:17px}
-.story-photos img,.photo-view img{width:100%;max-height:70dvh;object-fit:contain;background:#e8e1d4;border-radius:9px}
 figcaption{color:var(--muted);font-size:14px;margin:6px 0 12px;overflow-wrap:anywhere}
 @media(max-width:700px){.shell{width:calc(100% - 32px)}.header-inner{gap:7px;min-height:66px}.brand{font-size:24px;gap:5px}.brand>span{width:27px;height:27px}.brand svg{width:19px;height:19px}nav{margin:0;gap:0}nav button{padding:8px 6px;font-size:12px}nav svg{display:none}.header .primary{font-size:12px;padding-inline:7px;min-height:36px}.header .primary svg{width:13px;height:13px}.hero{min-height:390px;margin-top:17px;background-position:55% center}.journal{padding-top:30px}.form-row{grid-template-columns:1fr}}
 @media(max-width:355px){.brand>span{display:none}.shell{width:calc(100% - 20px)}}
@@ -102,13 +100,12 @@ figcaption{color:var(--muted);font-size:14px;margin:6px 0 12px;overflow-wrap:any
 .block-control{border:1px solid var(--line);border-radius:5px;background:var(--paper);min-width:32px;min-height:32px}
 .editor-block textarea{border:0;background:transparent;padding:0;line-height:1.75;min-height:120px}
 .editor-block>img{width:100%;max-height:360px;object-fit:contain;border-radius:6px;background:#e8e1d4;margin-bottom:10px}
-.story-content{display:grid;gap:22px;margin-top:22px}
+.story-content{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;margin-top:22px}
 .story-content .story-text{margin:0}
-.story-content img{width:100%;max-height:70dvh;object-fit:contain;background:#e8e1d4;border-radius:9px}
+.story-content>.photo-row{margin-block:0}
 .rich-story{font-size:18px;line-height:1.8;overflow-wrap:anywhere}
 .rich-story p{white-space:pre-wrap;margin:0 0 18px}
 .rich-story h3{font-family:var(--serif);font-size:36px;margin:24px 0 12px;line-height:1.2}
-.rich-story figure{margin:24px 0}
 .rich-story ul{padding-left:26px}
 dialog.writing-composer{width:100%;max-width:none;height:100dvh;max-height:100dvh;margin:0;border:0;border-radius:0}
 .writing-composer>.modal-content{width:100%;max-width:none;min-height:100%;margin:0;padding:28px clamp(16px,2vw,32px)}
