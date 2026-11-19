@@ -4,28 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content">
 <meta name="description" content="A private journal for your travel stories and photos.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
 <title>Roam Journal</title>
 <link rel="icon" href="/roam.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/journal.css">
 <link rel="stylesheet" href="/editor-prototype.css">
 <script type="module" src="/journal.js"></script>
 </head>
 <body>
 <header class="header"><div class="header-inner shell">
-<a class="brand" href="/"><span><img src="/roam.svg" width="30" height="30" alt=""></span>Roam Journal</a>
+<a class="brand" href="/"><img src="/roam.svg" width="32" height="32" alt=""><span>Roam<em>Journal</em></span></a>
 <nav aria-label="Journal"><button data-view="stories" class="active" aria-pressed="true">Stories</button><button data-view="gallery" aria-pressed="false">Gallery</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="map" aria-pressed="false">World Map</button><button data-view="trash" aria-pressed="false">Trash</button></nav>
-<button class="primary" data-add>＋ New trip</button>
+<button class="primary header-cta" data-add><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>New trip</button>
 </div></header>
 <main class="shell">
 <section class="hero" aria-labelledby="welcome"><div class="hero-copy">
+<p class="eyebrow">Private travel journal</p>
 <h1 id="welcome">The places<br>I’ve <em>been.</em></h1>
-<p>A travel journal for the stories, photos, and little moments worth keeping.</p>
-<button class="primary hero-button" data-add>＋ Add a trip</button>
+<p class="hero-lede">A travel journal for the stories, photos, and little moments worth keeping.</p>
+<div class="hero-actions">
+<button class="primary hero-button" data-add><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>Add a trip</button>
 <a class="primary hero-button" id="signin" href="/signin-with-chatgpt?return_to=%2F" target="_top" hidden>Sign in</a>
+</div>
 </div></section>
 <section id="journal" class="journal" aria-labelledby="journal-title">
-<div class="section-heading"><h2 id="journal-title">Trip stories</h2><span id="count"></span></div>
-<button type="button" id="export-journal" class="secondary" hidden>Export all active trips (.zip)</button>
+<div class="section-heading">
+<div class="heading-title"><h2 id="journal-title">Trip stories</h2><span id="count"></span></div>
+<button type="button" id="export-journal" class="secondary" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Export all active trips (.zip)</button>
+</div>
 <p id="export-status" role="status"></p>
 <div id="trip-filters" role="group" aria-label="Filter trips" hidden>
 <label>Search trips<input id="trip-search" type="search" placeholder="Title, destination, story or caption"></label>
@@ -36,13 +47,15 @@
 <div id="entries"><div class="empty" role="status">Opening your journal…</div></div>
 </section>
 </main>
-<footer class="footer shell"><span class="footer-brand">Roam Journal</span><span>Private journal</span></footer>
+<footer class="footer shell"><span class="footer-brand">Roam<em>Journal</em></span><span>Private journal · Your stories stay yours</span></footer>
 <dialog id="composer" class="writing-composer" aria-labelledby="form-title"><div class="modal-content">
 <button type="button" class="close" aria-label="Close" data-close>×</button>
+<p class="eyebrow composer-eyebrow">Roam Journal</p>
 <h2 id="form-title">New trip</h2>
 
 <form id="trip-form"><fieldset>
-<label>Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
+<div class="trip-fields">
+<label class="title-field">Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
 <label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
 <div class="place-search-row"><label>Map place (optional)<input name="map_city" list="map-cities" maxlength="500" autocomplete="off" placeholder="City, town or beach"></label>
 <button type="button" class="secondary" id="search-online">Search more places</button></div>
@@ -52,6 +65,7 @@
 <div class="form-row"><label>Start date<input name="date" type="date" required></label>
 <label>End date (optional)<input name="end_date" type="date"></label></div>
 <label>Tags (comma-separated)<input name="tags" maxlength="500" placeholder="Family, hiking"></label>
+</div>
 <section class="story-editor" aria-labelledby="editor-title">
 <h3 id="editor-title">Your story</h3>
 <div id="editor-toolbar" class="writing-toolbar" role="group" aria-label="Story formatting">
@@ -60,8 +74,8 @@
 <button type="button" data-command="heading" aria-label="Heading" aria-pressed="false">H2</button>
 <button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false">• List</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
-<button type="button" id="add-day">＋ Dated section</button>
-<button type="button" id="insert-photo" class="photo-button">＋ Photo</button>
+<button type="button" id="add-day">+ Dated section</button>
+<button type="button" id="insert-photo" class="photo-button">+ Photo</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
 <button type="button" data-command="undo" aria-label="Undo">↶</button>
 <button type="button" data-command="redo" aria-label="Redo">↷</button>

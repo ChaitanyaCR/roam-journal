@@ -9,7 +9,9 @@ export async function mapAssets() {
   const path = geoPath(projection).digits(1);
   const land = path(feature(topology, countries));
   const borders = path(mesh(topology, countries, (a, b) => a !== b));
-  const map = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480"><rect width="960" height="480" fill="#dfeae6"/><path d="${land}" fill="#fbf6e9"/><path d="${borders}" fill="none" stroke="#cabfa9" stroke-width=".55"/></svg>`;
+  // Transparent ocean and translucent land so the map reads on light and dark backgrounds;
+  // the page supplies the ocean colour.
+  const map = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480"><path d="${land}" fill="#8a919b" fill-opacity=".26"/><path d="${borders}" fill="none" stroke="#8a919b" stroke-opacity=".5" stroke-width=".55"/></svg>`;
 
   const source = JSON.parse(await readFile(new URL(import.meta.resolve("city-timezones/data/cityMap.json")), "utf8"));
   const cities = new Map();
