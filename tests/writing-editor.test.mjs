@@ -252,11 +252,13 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   const submittedIds = [];
   const editIds = [];
   globalThis.fetch = async (url, options) => {
+    if (url === "/map-cities.json") return Response.json([["Tokyo, Japan", 35.7, 139.7]]);
     if (options?.method === "POST") {
       submittedIds.push(options.body.get("id"));
       if (!failed) { failed = true; return Response.json({ message: "Temporary save failure" }, { status: 503 }); }
       saved = {
         id: options.body.get("id"), title: options.body.get("title"), destination: options.body.get("destination"),
+        city_pin: { label: options.body.get("map_city"), lat: 35.7, lng: 139.7 },
         end_date: options.body.get("end_date"), tags: options.body.get("tags").split(","), date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
         document: JSON.parse(options.body.get("document")),
       };
@@ -284,6 +286,10 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   document.querySelector("[data-add]").click();
   await waitFor(() => document.querySelector("#composer").open);
   const form = document.querySelector("#trip-form");
+  form.elements.map_city.value = "Tok";
+  form.elements.map_city.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await waitFor(() => document.querySelector("#map-cities option"));
+  form.elements.map_city.value = document.querySelector("#map-cities option").value;
   form.elements.namedItem("tags").value = "Coast,hiking";
   form.elements.namedItem("title").value = "My memory";
   form.elements.namedItem("destination").value = "Goa";
@@ -303,12 +309,14 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(draft.fields.end_date, "2027-01-01");
   assert.equal(draft.document.version, 2);
   assert.equal(draft.document.content.find(node => node.type === "daySection").content.some(node => node.type === "image"), true);
+  assert.equal(draft.fields.map_city, "Tokyo, Japan");
   assert.equal(draft.fields.tags, "Coast,hiking");
   assert.equal(draft.fields.title, "My memory");
   assert.equal(draft.uploads[0].name, "beach.png");
   document.querySelector("[data-add]").click();
   await waitFor(() => document.querySelector("#composer").open);
   assert.equal(document.querySelector("#form-title").textContent, "Resume draft");
+  assert.equal(form.elements.map_city.value, "Tokyo, Japan");
   assert.equal(form.elements.namedItem("tags").value, "Coast,hiking");
   assert.match(document.querySelector("#writing-editor figure img").getAttribute("src"), /^blob:/);
   assert.equal(document.querySelector("#writing-editor .story-day input").value, "2027-01-01");
@@ -486,4 +494,40 @@ test("move a trip from its detail to Trash and restore it after reopening the jo
   assert.match(document.querySelector("#entries").textContent, /Trash is empty/);
   view("gallery");
   assert.equal(document.querySelector(".gallery-tile img").alt, "Sunset");
+});
+
+test("World Map groups active trips, applies shared filters and opens the selected story", async t => {
+  const html = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
+  document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const base = { destination: "Japan", date: "2026-02-03", story: "Street market", photos: [], tags: [],
+    city_pin: { label: "Tokyo, Japan", lat: 35.7, lng: 139.7 } };
+  globalThis.fetch = async () => Response.json([
+    { ...base, id: "a", title: "First visit" }, { ...base, id: "b", title: "Night walk", tags: ["Night"] },
+    { ...base, id: "c", title: "Old town", city_pin: { label: "Kyoto, Japan", lat: 35, lng: 135.8 } },
+    { ...base, id: "d", title: "Hidden trip", deleted_at: "2026-03-02" },
+    { ...base, id: "e", title: "Unpinned", city_pin: null },
+  ]);
+  await import("../src/journal.js?map-test");
+  await waitFor(() => document.querySelector(".card"));
+  document.querySelector('[data-view="map"]').click();
+  const pins = document.querySelectorAll(".map-pin");
+  assert.equal(pins.length, 2);
+  pins[1].click();
+  assert.equal(document.querySelector(".map-panel select").value, "Tokyo, Japan");
+  assert.equal(document.querySelectorAll(".map-story").length, 2);
+  const tag = document.querySelector("#trip-tag");
+  tag.value = "night";
+  tag.dispatchEvent(new window.Event("change"));
+  assert.equal(document.querySelectorAll(".map-pin").length, 1);
+  document.querySelector(".map-story").click();
+  assert.equal(document.querySelector("#detail-content h2").textContent, "Night walk");
+  document.querySelector("#detail [data-close]").click();
+  const search = document.querySelector("#trip-search");
+  search.value = "unmatched";
+  search.dispatchEvent(new window.Event("input"));
+  assert.equal(document.querySelectorAll(".map-pin").length, 0);
+  document.querySelector(".empty button").click();
+  assert.equal(document.querySelectorAll(".map-pin").length, 2);
 });

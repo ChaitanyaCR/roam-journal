@@ -10,9 +10,11 @@ For a multi-day trip, enter a start and end date. Choose **＋ Dated section** t
 
 ## Browsing your journal
 
-Stories, Gallery and Timeline share the same search, year and tag filters. Search matches titles, destinations, story text and photo captions. Add comma-separated tags in the trip editor. Timeline shows trips newest first, with stories from the same date stacked under one milestone.
+Stories, Gallery, Timeline and World Map share the same search, year and tag filters. Search matches titles, destinations, story text and photo captions. Add comma-separated tags in the trip editor. Timeline shows trips newest first, with stories from the same date stacked under one milestone.
 
-Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
+Choose a suggestion in **Map place (optional)** when writing or editing a trip. In **World Map**, select a pin or choose a location from the list to open its stories. Clear the map city field to remove the pin. Place suggestions and the map are served locally by the journal. Indian place search includes GeoNames towns, alternate spellings, and Palolem Beach. [Catalog sources and attribution](scripts/data/README.md)
+
+Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline, World Map and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
 
 See the [phase specifications](specification/README.md) for the roadmap, implementation status, and acceptance checks for each phase.
 

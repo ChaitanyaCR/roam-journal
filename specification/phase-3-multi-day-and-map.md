@@ -1,6 +1,6 @@
 # Phase 3 · Multi-day trips and World Map
 
-**Status** In progress. Multi-day writing is implemented. World Map is next.
+**Status** Implemented. Multi-day writing and World Map are available.
 
 ## Multi-day writing
 
@@ -14,7 +14,9 @@ Migration 0006 adds a nullable end date. The editor appends a dated section afte
 
 Add **World Map** beside Timeline in the journal navigation. The author can associate a trip with a city pin while keeping their written destination. Selecting a pin shows the matching trips at that location and opens the existing trip detail. Apply the same search, year and tag selections as Timeline. Exclude trashed trips. Unpinned trips remain accessible in Stories and Timeline and their photos in Gallery.
 
-**Proposed implementation** Store an optional city label and validated coordinates in D1. Use a stable location identifier for grouping trips at the same city. Choose the map renderer and city selection method before implementing the picker. Provide a keyboard-accessible list of the visible locations and trips.
+The build creates an equirectangular map from world-atlas and a searchable catalog from city-timezones, supplemented with Indian GeoNames places, alternate names and Palolem Beach from Wikidata. Both assets are served by the journal. The Worker resolves the chosen catalog label to validated coordinates and stores the label and coordinates together in nullable D1 column `city_pin` (migration 0007). The full city, region and country label identifies a location across trips. Clearing the map city removes the pin. Older clients that omit the field on edit retain the existing pin.
+
+The map uses the active, filtered trip list. The location selector provides keyboard access to the same city groups as the pins, including cities that overlap on small screens. Selecting a location lists its matching stories in date order.
 
 ## Acceptance checks
 

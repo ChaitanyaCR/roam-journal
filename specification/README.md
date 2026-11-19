@@ -1,17 +1,17 @@
 # Roam Journal specifications
 
-Roam Journal is a private travel diary. A trip owns its story and photos. Stories, Gallery and Timeline browse those same trips. Phase 3 adds World Map. Changes made through the editor should appear in every applicable view.
+Roam Journal is a private travel diary. A trip owns its story and photos. Stories, Gallery, Timeline and World Map browse those same trips. Changes made through the editor should appear in every applicable view.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | [1 · Draft recovery and photo viewing](phase-1-drafts-and-photos.md) | Resume unfinished writing and browse a trip’s photos full screen | Implemented. Hands-on browser and mobile review remains open. |
 | [2 · Find and organize trips](phase-2-discovery-and-trash.md) | Search, tags, shared filters, Timeline and recoverable deletion | Implemented, including Trash and restore. |
-| [3 · Multi-day trips and World Map](phase-3-multi-day-and-map.md) | Date ranges, dated story sections and city pins | In progress. Date ranges and dated story sections are implemented. World Map is next. |
+| [3 · Multi-day trips and World Map](phase-3-multi-day-and-map.md) | Date ranges, dated story sections and city pins | Implemented, including optional city pins and shared map filters. |
 | [4 · Portable export](phase-4-export.md) | A downloadable ZIP with offline stories, original photos and structured data | Planned. Includes the Phase 2 and 3 data. |
 
 ## Resume development
 
-1. Start with [World Map in Phase 3](phase-3-multi-day-and-map.md#world-map) and read its acceptance checks. Each phase describes the intended behavior. Items marked **Proposed** are implementation choices that can be revised.
+1. Start with [portable export in Phase 4](phase-4-export.md) and read its acceptance checks. Each phase describes the intended behavior. Items marked **Proposed** are implementation choices that can be revised.
 2. Follow the [project setup](../README.md#local-development) with Node.js 22 or later. Run the app locally with Wrangler and run `npm test` for the baseline.
 3. Implement a complete slice through the existing editor, Worker and views. When changing storage, add a numbered SQL migration under `drizzle/`, update its migration journal, and run `npm run db:local`.
 4. Exercise the phase’s acceptance checks with new trips and older entries. When a slice ships, update its status here and record any remaining checks or changes in the phase file.

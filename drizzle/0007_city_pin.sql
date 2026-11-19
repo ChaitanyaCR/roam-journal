@@ -1,0 +1,1 @@
+ALTER TABLE trips ADD COLUMN city_pin TEXT;

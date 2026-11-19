@@ -12,17 +12,17 @@ function storage({ failInsert = false } = {}) {
     async first() { return rows.get(args[0] + ":" + args[1]) ?? null; },
     async run() {
       if (sql.startsWith("UPDATE trips")) {
-        const [title, destination, date, end_date, story, photos, blocks, document, tags, revision, owner, id, expectedRevision] = args;
+        const [title, destination, date, end_date, city_pin, story, photos, blocks, document, tags, revision, owner, id, expectedRevision] = args;
         const key = owner + ":" + id;
         const row = rows.get(key);
         if (!row || row.revision !== expectedRevision) return { meta: { changes: 0 } };
-        rows.set(key, { ...row, title, destination, date, end_date, story, photos, blocks, document, tags, revision });
+        rows.set(key, { ...row, title, destination, date, end_date, city_pin, story, photos, blocks, document, tags, revision });
         return { meta: { changes: 1 } };
       }
       assert.match(sql, /INSERT INTO trips/);
       if (failInsert) throw new Error("Database unavailable");
-      const [id, owner, title, destination, date, end_date, story, photos, blocks, document, tags] = args;
-      rows.set(owner + ":" + id, { id, owner, title, destination, date, end_date, story, photos, blocks, document, tags, revision: null });
+      const [id, owner, title, destination, date, end_date, city_pin, story, photos, blocks, document, tags] = args;
+      rows.set(owner + ":" + id, { id, owner, title, destination, date, end_date, city_pin, story, photos, blocks, document, tags, revision: null });
     },
   }; } }; } };
   const BUCKET = {
@@ -244,6 +244,7 @@ test("trash and restore preserve the entire trip and reject stale and cross-acco
     paragraph("Arrival"), { type: "image", attrs: { index: 0, caption: "At the station" } }, paragraph("Home"),
   ] }));
   data.set("tags", "Family, travel");
+  data.set("map_city", "Tokyo, Japan");
   const saved = await (await worker.fetch(request("POST", data), env)).json();
   const path = "/api/trips/" + saved.id;
   const move = (action, revision, requestId, owner) => worker.fetch(request("POST",
@@ -254,6 +255,8 @@ test("trash and restore preserve the entire trip and reject stale and cross-acco
   assert.equal((await move("trash", null, deletion)).status, 200);
   assert.deepEqual(await list(), []);
   const [trashed] = await list("alice", "?include=trash");
+  assert.equal(trashed.city_pin.label, "Tokyo, Japan");
+  assert.ok(Math.abs(trashed.city_pin.lng - 140) < 1);
   assert.ok(trashed.deleted_at);
   assert.equal(trashed.revision, deletion);
   assert.deepEqual(await list("bob", "?include=trash"), []);
@@ -316,4 +319,61 @@ test("a legacy story can gain dated sections and retain its photo and date range
   const [listed] = await (await worker.fetch(request("GET"), env)).json();
   assert.deepEqual(listed.document, doc);
   assert.equal(listed.end_date, "2027-01-01");
+});
+
+test("city pins use catalog coordinates and support changing, preserving and removing a pin", async () => {
+  const env = storage();
+  const data = form();
+  data.set("story", "A walk through the market");
+  data.set("map_city", JSON.stringify({ label: "Unknown", lat: 190, lng: 360 }));
+  assert.equal((await worker.fetch(request("POST", data), env)).status, 400);
+  data.set("map_city", "tokyo, japan");
+  const saved = await (await worker.fetch(request("POST", data), env)).json();
+  assert.equal(saved.city_pin.label, "Tokyo, Japan");
+  assert.ok(Math.abs(saved.city_pin.lat - 35.7) < 1);
+  assert.equal(saved.destination, "Goa");
+  const edit = form();
+  edit.set("photoKeys", "[]");
+  edit.set("document", JSON.stringify({ version: 1, type: "doc", content: [
+    { type: "paragraph", content: [{ type: "text", text: saved.story }] },
+  ] }));
+  let revision = "";
+  for (const city of [undefined, "Kyoto, Japan", ""]) {
+    edit.set("id", crypto.randomUUID());
+    edit.set("revision", revision);
+    if (city !== undefined) edit.set("map_city", city);
+    const response = await worker.fetch(request("PATCH", edit, "alice", "/api/trips/" + saved.id), env);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.city_pin?.label ?? "", city ?? saved.city_pin.label);
+    revision = result.revision;
+  }
+  const [trip] = await (await worker.fetch(request("GET"), env)).json();
+  assert.equal(trip.city_pin, null);
+  assert.equal(trip.story, saved.story);
+});
+
+test("Indian place suggestions resolve to distinct saved pins using common spellings", async () => {
+  const { indexPlaces, findPlaces } = await import("../src/place-search.js");
+  const catalog = await worker.fetch(request("GET", undefined, null, "/map-cities.json"), {});
+  const index = indexPlaces(await catalog.json());
+  const env = storage();
+  for (const [query, label] of [
+    ["Rishikesh", "Rishikesh, Uttarakhand, India"],
+    ["Spiti Valley", "Spiti Valley, Himachal Pradesh, India"],
+    ["Havlock Islands", "Swaraj Dweep, Andaman and Nicobar Islands, India"],
+    ["Havelock Island", "Swaraj Dweep, Andaman and Nicobar Islands, India"],
+    ["Palolem", "Palolem Beach, Goa, India"],
+    ["Canacona", "Canacona, Goa, India"],
+    ["Bangalore", "Bengaluru, Karnataka, India"],
+  ]) {
+    assert.equal(findPlaces(index, query)[0].label, label);
+    const data = form();
+    data.set("map_city", label);
+    data.set("story", "A holiday memory");
+    const response = await worker.fetch(request("POST", data), env);
+    assert.equal(response.status, 201);
+    const saved = await response.json();
+    assert.equal(saved.city_pin.label, label);
+  }
 });

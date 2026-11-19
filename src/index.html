@@ -13,7 +13,7 @@
 <body>
 <header class="header"><div class="header-inner shell">
 <a class="brand" href="/"><span><img src="/roam.svg" width="30" height="30" alt=""></span>Roam Journal</a>
-<nav aria-label="Journal"><button data-view="stories" class="active" aria-pressed="true">Stories</button><button data-view="gallery" aria-pressed="false">Gallery</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="trash" aria-pressed="false">Trash</button></nav>
+<nav aria-label="Journal"><button data-view="stories" class="active" aria-pressed="true">Stories</button><button data-view="gallery" aria-pressed="false">Gallery</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="map" aria-pressed="false">World Map</button><button data-view="trash" aria-pressed="false">Trash</button></nav>
 <button class="primary" data-add>＋ New trip</button>
 </div></header>
 <main class="shell">
@@ -42,6 +42,8 @@
 <form id="trip-form"><fieldset>
 <label>Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
 <label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
+<label>Map place (optional)<input name="map_city" list="map-cities" maxlength="200" autocomplete="off" placeholder="City, town or beach"></label>
+<datalist id="map-cities"></datalist><p id="city-hint" role="status" hidden></p>
 <div class="form-row"><label>Start date<input name="date" type="date" required></label>
 <label>End date (optional)<input name="end_date" type="date"></label></div>
 <label>Tags (comma-separated)<input name="tags" maxlength="500" placeholder="Family, hiking"></label>

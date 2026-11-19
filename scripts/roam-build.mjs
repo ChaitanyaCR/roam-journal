@@ -1,6 +1,8 @@
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
+import { mapAssets } from "./map-assets.mjs";
+
 const files = {
   "/": ["index.html", "text/html; charset=utf-8"],
   "/journal.css": ["journal.css", "text/css; charset=utf-8"],
@@ -9,7 +11,7 @@ const files = {
   "/editor-prototype.css": ["editor-prototype.css", "text/css; charset=utf-8"],
 };
 
-const assets = {};
+const assets = await mapAssets();
 for (const [path, [file, type]] of Object.entries(files)) {
   assets[path] = { type, body: await readFile(new URL("../src/" + file, import.meta.url), "utf8") };
 }

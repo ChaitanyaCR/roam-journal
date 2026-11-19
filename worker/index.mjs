@@ -3,7 +3,7 @@ import { normalizeDocument, documentText, validDate } from "../shared/story-docu
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 const MB = 1024 * 1024;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags, deleted_at, end_date";
+const tripColumns = "id, title, destination, date, story, photos, blocks, document, revision, tags, deleted_at, end_date, city_pin";
 const photoLimit = "Choose up to 12 JPG, PNG, or WebP photos, up to 8 MB each and 28 MB total.";
 const formats = {
   "image/jpeg": b => b[0] === 255 && b[1] === 216 && b[2] === 255,
@@ -26,7 +26,7 @@ function trip(row) {
     { type: "text", text: row.story },
     ...photos.map((_, index) => ({ type: "photo", index })),
   ];
-  return { ...row, tags: JSON.parse(row.tags), photos, blocks, document: row.document ? JSON.parse(row.document) : null };
+  return { ...row, city_pin: JSON.parse(row.city_pin ?? "null"), tags: JSON.parse(row.tags), photos, blocks, document: row.document ? JSON.parse(row.document) : null };
 }
 
 async function listTrips(db, owner, includeTrash) {
@@ -65,6 +65,16 @@ async function deletePhotos(bucket, photos, keep) {
   if (bucket) await Promise.allSettled(photos.filter(photo => !keptKeys.has(photo.key)).map(photo => bucket.delete(photo.key)));
 }
 
+let cityCatalog;
+function resolveCity(label) {
+  if (!cityCatalog) {
+    cityCatalog = new Map(JSON.parse(assets["/map-cities.json"].body).map(([label, lat, lng]) => [
+      label.toLowerCase(), { label, lat, lng },
+    ]));
+  }
+  return cityCatalog.get(label.toLowerCase());
+}
+
 async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = null) {
   if (Number(request.headers.get("content-length")) > 29 * MB) {
     return error("Keep the combined photo size under 28 MB.", 413);
@@ -91,6 +101,8 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     }
   }
   const date = field("date");
+  const cityLabel = field("map_city");
+  let pin = cityLabel ? resolveCity(cityLabel) : null;
   let endDate = field("end_date") || null;
   let story = field("story");
   const files = data.getAll("photos");
@@ -108,6 +120,8 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
     if (existing.deleted_at) return editConflict();
     if (existing.revision === revision) return json(trip(existing));
     if (existing.revision !== expectedRevision) return editConflict();
+    const savedPin = JSON.parse(existing.city_pin ?? "null");
+    if (!data.has("map_city") || cityLabel === savedPin?.label) pin = savedPin;
     if (!data.has("end_date")) endDate = existing.end_date ?? null;
     if (!data.has("tags")) tags.push(...JSON.parse(existing.tags));
     existingPhotos = JSON.parse(existing.photos);
@@ -122,6 +136,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
       return error("The story contains an invalid photo.", 400);
     }
   }
+  if (cityLabel && !pin) return error("Choose a city from the map suggestions or clear the map city field.", 400);
   let blocks;
   let document = null;
   if (data.has("document")) {
@@ -209,17 +224,17 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
         });
       }
     }
-    const values = [title, destination, date, endDate, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
+    const values = [title, destination, date, endDate, pin ? JSON.stringify(pin) : null, story, JSON.stringify(photos), JSON.stringify(blocks), document ? JSON.stringify(document) : null, JSON.stringify(tags)];
     writeAttempted = true;
     if (tripId) {
-      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, end_date = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ? AND deleted_at IS NULL")
+      const update = await db.prepare("UPDATE trips SET title = ?, destination = ?, date = ?, end_date = ?, city_pin = ?, story = ?, photos = ?, blocks = ?, document = ?, tags = ?, revision = ? WHERE owner = ? AND id = ? AND revision IS ? AND deleted_at IS NULL")
         .bind(...values, revision, owner, id, expectedRevision).run();
       if (!update.meta.changes) {
         conflict = true;
         throw new Error("The trip revision changed.");
       }
     } else {
-      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, end_date, story, photos, blocks, document, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      await db.prepare("INSERT INTO trips (id, owner, title, destination, date, end_date, city_pin, story, photos, blocks, document, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(id, owner, ...values).run();
     }
   } catch {
@@ -236,7 +251,7 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
   }
 
   if (tripId) await deletePhotos(bucket, existingPhotos, photos);
-  return json({ id, title, destination, date, end_date: endDate, story, photos, blocks, document, revision, tags }, tripId ? 200 : 201);
+  return json({ id, title, destination, date, end_date: endDate, city_pin: pin, story, photos, blocks, document, revision, tags }, tripId ? 200 : 201);
 }
 
 async function getPhoto(bucket, key, owner) {

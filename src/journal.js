@@ -1,3 +1,4 @@
+import { indexPlaces, findPlaces } from "./place-search.js";
 import { createWritingEditor } from "./writing-editor.js";
 import { layoutStoryPhotos, renderStory } from "./story-renderer.js";
 import { clearDraft, readDraft, saveDraft } from "./trip-drafts.js";
@@ -33,7 +34,7 @@ let draftWrites = Promise.resolve();
 const search = $("#trip-search");
 const yearFilter = $("#trip-year");
 const tagFilter = $("#trip-tag");
-const draftFields = ["title", "destination", "date", "end_date", "tags"];
+const draftFields = ["title", "destination", "map_city", "date", "end_date", "tags"];
 const dateLabel = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
 
 const monthLabel = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" });
@@ -253,6 +254,70 @@ function timeline(matching) {
   return root;
 }
 
+let selectedCity = "";
+function worldMap(pinned) {
+  const groups = new Map();
+  for (const trip of pinned) {
+    const label = trip.city_pin.label;
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(trip);
+  }
+  const root = element("div", "", "world-map");
+  const chart = element("div", "", "map-chart");
+  chart.setAttribute("role", "group");
+  chart.setAttribute("aria-label", "World map of your trips");
+  root.append(chart);
+  if (!pinned.length) {
+    selectedCity = "";
+    return root;
+  }
+  const panel = element("div", "", "map-panel");
+  const label = element("label", "Location");
+  const picker = element("select");
+  const stories = element("ul", "", "map-stories");
+  label.append(picker);
+  panel.append(label, stories);
+  root.append(panel);
+  const markers = new Map();
+  function selectCity(city) {
+    selectedCity = picker.value = city;
+    for (const [key, marker] of markers) marker.setAttribute("aria-pressed", String(key === city));
+    stories.replaceChildren(...groups.get(city).map(trip => {
+      const item = element("li");
+      const read = button("", "map-story", () => showDetail(trip));
+      read.append(element("strong", trip.title), tripDate(trip));
+      item.append(read);
+      return item;
+    }));
+  }
+  for (const city of [...groups.keys()].sort((a, b) => a.localeCompare(b))) {
+    const trips = groups.get(city);
+    const { lat, lng } = trips[0].city_pin;
+    const caption = city + " · " + trips.length + (trips.length === 1 ? " trip" : " trips");
+    const option = element("option", caption);
+    option.value = city;
+    picker.append(option);
+    const marker = button("", "map-pin", () => selectCity(city));
+    marker.title = caption;
+    marker.setAttribute("aria-label", caption);
+    marker.style.left = ((lng + 180) / 360 * 100) + "%";
+    marker.style.top = ((90 - lat) / 180 * 100) + "%";
+    chart.append(marker);
+    markers.set(city, marker);
+  }
+  picker.addEventListener("change", () => selectCity(picker.value));
+  selectCity(groups.has(selectedCity) ? selectedCity : picker.options[0].value);
+  return root;
+}
+
+function clearFilters() {
+  search.value = "";
+  yearFilter.value = "";
+  tagFilter.value = "";
+  render();
+  search.focus();
+}
+
 function render() {
   const entries = $("#entries");
   const count = $("#count");
@@ -263,7 +328,7 @@ function render() {
   const matching = trash ? trips.filter(trip => trip.deleted_at) : filteredTrips(query, yearFilter.value, tagFilter.value);
   const photos = gallery ? matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo }))) : [];
   entries.replaceChildren();
-  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline", trash: "Trash" }[view];
+  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline", map: "World Map", trash: "Trash" }[view];
   count.textContent = "";
   for (const control of document.querySelectorAll("[data-view]")) {
     const active = control.dataset.view === view;
@@ -285,6 +350,19 @@ function render() {
   } else if (state === "signed-out") {
     empty.append(element("h3", "Sign in to view your journal"));
   } else {
+    if (view === "map") {
+      const pinned = matching.filter(trip => trip.city_pin);
+      entries.append(worldMap(pinned));
+      count.textContent = pinned.length + (pinned.length === 1 ? " pinned trip" : " pinned trips");
+      if (!pinned.length) {
+        const filtered = query || yearFilter.value || tagFilter.value;
+        empty.append(element("h3", filtered ? "No matching pinned trips" : "Your map is empty"),
+          element("p", "Choose a map city in a trip’s editor to add a pin."));
+        if (filtered) empty.append(button("Clear filters", "secondary", clearFilters));
+        entries.append(empty);
+      }
+      return;
+    }
     const length = gallery ? photos.length : matching.length;
     count.textContent = length + (gallery ? " photo" : " trip") + (length === 1 ? "" : "s");
     if (length && view === "timeline") {
@@ -309,13 +387,7 @@ function render() {
     }
     if (query || yearFilter.value || tagFilter.value) {
       empty.append(element("h3", matching.length ? "Matching trips have no photos" : "No matching trips"),
-        button("Clear filters", "secondary", () => {
-          search.value = "";
-          yearFilter.value = "";
-          tagFilter.value = "";
-          render();
-          search.focus();
-        }));
+        button("Clear filters", "secondary", clearFilters));
       entries.append(empty);
       return;
     }
@@ -416,6 +488,8 @@ async function openComposer(trip = null) {
   form.elements.title.value = trip?.title ?? "";
   form.elements.tags.value = trip?.tags?.join(",") ?? "";
   form.elements.destination.value = trip?.destination ?? "";
+  form.elements.map_city.value = trip?.city_pin?.label ?? "";
+  $("#city-hint").hidden = true;
   form.elements.date.value = trip?.date ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   form.elements.end_date.value = trip?.end_date ?? "";
   if (draft) {
@@ -519,6 +593,44 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) void persistDraft();
 });
 
+const cityInput = form.elements.map_city;
+let catalogRequest;
+async function suggestCities() {
+  const options = $("#map-cities");
+  const hint = $("#city-hint");
+  hint.hidden = true;
+  const query = cityInput.value.trim().toLowerCase();
+  options.replaceChildren();
+  if (!query) return;
+  try {
+    catalogRequest ??= fetch("/map-cities.json").then(response => {
+      if (!response.ok) throw new Error();
+      return response.json();
+    }).then(indexPlaces).catch(error => { catalogRequest = undefined; throw error; });
+    const cities = await catalogRequest;
+    if (cityInput.value.trim().toLowerCase() !== query) return;
+    const matches = findPlaces(cities, query);
+    options.replaceChildren(...matches.map(({ label, alias }) => {
+      const option = element("option");
+      option.value = label;
+      if (alias) option.label = alias + " — " + label;
+      return option;
+    }));
+    if (!matches.length) {
+      const maps = element("a", "Search Google Maps ↗");
+      maps.href = "https://www.google.com/maps/search/?" + new URLSearchParams({ api: "1", query: cityInput.value.trim() });
+      maps.target = "_blank";
+      maps.rel = "noopener noreferrer";
+      hint.replaceChildren("No matching place. Try another spelling or clear the field to save without a pin. ", maps);
+      hint.hidden = false;
+    }
+  } catch {
+    hint.textContent = "City suggestions could not load. Type again to retry.";
+    hint.hidden = false;
+  }
+}
+cityInput.addEventListener("input", suggestCities);
+cityInput.addEventListener("focus", suggestCities);
 form.elements.date.addEventListener("input", () => { form.elements.end_date.min = form.elements.date.value; });
 form.addEventListener("input", markDirty);
 form.addEventListener("invalid", () => {
