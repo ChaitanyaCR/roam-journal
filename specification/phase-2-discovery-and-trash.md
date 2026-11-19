@@ -1,6 +1,6 @@
 # Phase 2 · Search, tags, Timeline and Trash
 
-**Status** Implemented. Stories, Gallery and Timeline share search, year and tag filters. Trips can be moved to Trash and restored.
+**Status** Implemented. Stories, Gallery and Timeline share search, year and tag filters. Trips can be moved to Trash and restored. The interface now labels this **Archived** (actions **Archive** and **Unarchive**); the API routes and `deleted_at` column keep their original names.
 
 ## Delivery order
 

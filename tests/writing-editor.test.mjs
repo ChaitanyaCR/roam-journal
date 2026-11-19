@@ -473,7 +473,7 @@ test("Timeline groups trips by start month and shares its selection with Stories
   assert.equal(document.querySelectorAll(".timeline-trip").length, 4);
 });
 
-test("move a trip from its detail to Trash and restore it after reopening the journal", async t => {
+test("archive a trip from its detail and unarchive it after reopening the journal", async t => {
   const html = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -497,7 +497,7 @@ test("move a trip from its detail to Trash and restore it after reopening the jo
   const detailAction = () => document.querySelector(".detail-meta button:last-child");
   await openJournal("first");
   document.querySelector(".card").click();
-  assert.equal(detailAction().textContent, "Move to Trash");
+  assert.equal(detailAction().textContent, "Archive");
   detailAction().click();
   await waitFor(() => !document.querySelector("#detail").open);
   await openJournal("second");
@@ -507,11 +507,12 @@ test("move a trip from its detail to Trash and restore it after reopening the jo
   }
   view("trash");
   document.querySelector(".card").click();
-  assert.equal(detailAction().textContent, "Restore trip");
+  assert.equal(detailAction().textContent, "Unarchive");
+  assert.equal(document.querySelector('[data-view="trash"]').textContent, "Archived");
   assert.equal(document.querySelectorAll(".detail-meta button").length, 1);
   detailAction().click();
   await waitFor(() => !document.querySelector("#detail").open);
-  assert.match(document.querySelector("#entries").textContent, /Trash is empty/);
+  assert.match(document.querySelector("#entries").textContent, /Nothing archived/);
   view("gallery");
   assert.equal(document.querySelector(".gallery-tile img").alt, "Sunset");
 });

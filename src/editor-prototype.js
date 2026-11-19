@@ -1,5 +1,6 @@
 import { createWritingEditor } from "./writing-editor.js";
 import { layoutStoryPhotos } from "./story-renderer.js";
+import { setLabel } from "./icons.js";
 
 const $ = selector => document.querySelector(selector);
 const picker = $("#draft-photos");
@@ -77,7 +78,7 @@ $("#preview-toggle").addEventListener("click", () => {
   }
   for (const id of ["#writing-fields", "#editor-toolbar", "#writing-editor", "#writing-hint"]) $(id).hidden = preview;
   reading.hidden = !preview;
-  $("#preview-toggle").textContent = preview ? "Continue writing" : "Preview story";
+  setLabel($("#preview-toggle"), preview ? "pencil" : "eye", preview ? "Continue writing" : "Preview story");
   $("#preview-toggle").setAttribute("aria-pressed", String(preview));
   if (!preview) editor.commands.focus();
 });

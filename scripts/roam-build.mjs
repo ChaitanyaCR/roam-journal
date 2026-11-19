@@ -7,6 +7,7 @@ const files = {
   "/": ["index.html", "text/html; charset=utf-8"],
   "/journal.css": ["journal.css", "text/css; charset=utf-8"],
   "/roam.svg": ["roam.svg", "image/svg+xml"],
+  "/icons.svg": ["icons.svg", "image/svg+xml"],
   "/editor-prototype": ["editor-prototype.html", "text/html; charset=utf-8"],
   "/editor-prototype.css": ["editor-prototype.css", "text/css; charset=utf-8"],
 };

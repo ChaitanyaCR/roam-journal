@@ -4,6 +4,7 @@ import { createWritingEditor } from "./writing-editor.js";
 import { layoutStoryPhotos, renderStory } from "./story-renderer.js";
 import { clearDraft, readDraft, saveDraft } from "./trip-drafts.js";
 import { createPhotoViewer } from "./photo-viewer.js";
+import { icon, setLabel } from "./icons.js";
 
 const $ = selector => document.querySelector(selector);
 const composer = $("#composer");
@@ -71,10 +72,29 @@ function image(photo, trip) {
   return node;
 }
 
+function placeholder(className, tag = "div") {
+  const node = element(tag, "", className);
+  node.append(icon("mountain"));
+  return node;
+}
+
+function readLink() {
+  const read = element("span", "Read story", "read");
+  read.append(icon("arrow-right"));
+  return read;
+}
+
+function emptyIcon(name) {
+  const node = element("span", "", "empty-icon");
+  node.setAttribute("aria-hidden", "true");
+  node.append(icon(name));
+  return node;
+}
+
 function trashButton(trip) {
   const restore = Boolean(trip.deleted_at);
   const requestId = crypto.randomUUID();
-  const control = button(restore ? "Restore trip" : "Move to Trash", "secondary", async () => {
+  const control = button("", "secondary archive-action", async () => {
     if (busy) return;
     busy = true;
     control.disabled = true;
@@ -89,7 +109,7 @@ function trashButton(trip) {
       setTrips(trips.map(item => item.id === result.id ? result : item));
       if (control.isConnected && detail.open) detail.close();
       render();
-      $("#notice").textContent = restore ? "Trip restored." : "Trip moved to Trash.";
+      $("#notice").textContent = restore ? "Trip unarchived." : "Trip archived.";
       $("#notice").hidden = false;
     } catch (failure) {
       if (control.isConnected && detail.open) showDetailError(control, failure.message || "Try again.");
@@ -98,6 +118,8 @@ function trashButton(trip) {
       control.disabled = false;
     }
   });
+  setLabel(control, restore ? "archive-restore" : "archive", restore ? "Unarchive" : "Archive");
+  control.title = restore ? "Return this trip to your journal" : "Hide this trip from your journal. You can unarchive it anytime.";
   return control;
 }
 
@@ -149,7 +171,11 @@ function showDetail(trip, notice) {
   }
   const meta = element("div", "", "detail-meta");
   meta.append(date);
-  if (!trip.deleted_at) meta.append(button("Edit trip", "secondary", () => openComposer(trip)));
+  if (!trip.deleted_at) {
+    const edit = button("", "secondary edit-action", () => openComposer(trip));
+    setLabel(edit, "pencil", "Edit trip");
+    meta.append(edit);
+  }
   meta.append(trashButton(trip));
   content.append(meta);
   if (trip.tags?.length) content.append(element("p", trip.tags.join(" · "), "trip-tags"));
@@ -166,11 +192,11 @@ function showDetail(trip, notice) {
 
 function tripCard(trip) {
   const card = button("", "card", () => showDetail(trip));
-  card.append(trip.photos[0] ? image(trip.photos[0], trip) : element("div", "✧", "no-cover"));
+  card.append(trip.photos[0] ? image(trip.photos[0], trip) : placeholder("no-cover"));
   const copy = element("div", "", "card-copy");
   const date = tripDate(trip);
   copy.append(element("span", trip.destination, "location"), element("h3", trip.title), date,
-    element("p", trip.story), element("span", "Read story →", "read"));
+    element("p", trip.story), readLink());
   card.append(copy);
   return card;
 }
@@ -243,7 +269,7 @@ function timeline(matching) {
       dayIndex++;
     }
     const card = button("", "timeline-trip", () => showDetail(trip));
-    const cover = trip.photos[0] ? image(trip.photos[0], trip) : element("span", "✧", "timeline-placeholder");
+    const cover = trip.photos[0] ? image(trip.photos[0], trip) : placeholder("timeline-placeholder", "span");
     cover.setAttribute("aria-hidden", "true");
     const copy = element("span", "", "timeline-copy");
     copy.append(element("strong", trip.title), element("span", trip.destination, "location"));
@@ -338,7 +364,8 @@ function render() {
   const matching = trash ? trips.filter(trip => trip.deleted_at) : filteredTrips(query, yearFilter.value, tagFilter.value);
   const photos = gallery ? matching.flatMap(trip => trip.photos.map(photo => ({ trip, photo }))) : [];
   entries.replaceChildren();
-  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline", map: "World Map", trash: "Trash" }[view];
+  $("#journal").dataset.view = view;
+  $("#journal-title").textContent = { stories: "Trip stories", gallery: "Photo gallery", timeline: "Timeline", map: "World Map", trash: "Archived" }[view];
   count.textContent = "";
   for (const control of document.querySelectorAll("[data-view]")) {
     const active = control.dataset.view === view;
@@ -356,7 +383,9 @@ function render() {
     empty.setAttribute("role", "status");
     empty.textContent = "Opening your journal…";
   } else if (state === "error") {
-    empty.append(element("h3", "Your journal couldn’t load"), button("Try again", "secondary", load));
+    const retry = button("", "secondary", load);
+    setLabel(retry, "refresh", "Try again");
+    empty.append(emptyIcon("refresh"), element("h3", "Your journal couldn’t load"), retry);
   } else if (state === "signed-out") {
     empty.append(element("h3", "Sign in to view your journal"));
   } else {
@@ -366,7 +395,7 @@ function render() {
       count.textContent = pinned.length + (pinned.length === 1 ? " pinned trip" : " pinned trips");
       if (!pinned.length) {
         const filtered = query || yearFilter.value || tagFilter.value;
-        empty.append(element("h3", filtered ? "No matching pinned trips" : "Your map is empty"),
+        empty.append(emptyIcon("map-pin"), element("h3", filtered ? "No matching pinned trips" : "Your map is empty"),
           element("p", "Choose a map city in a trip’s editor to add a pin."));
         if (filtered) empty.append(button("Clear filters", "secondary", clearFilters));
         entries.append(empty);
@@ -391,21 +420,22 @@ function render() {
       return;
     }
     if (trash) {
-      empty.append(element("h3", "Trash is empty"));
+      empty.append(emptyIcon("archive"), element("h3", "Nothing archived"),
+        element("p", "Archive a trip to hide it from your journal without losing it. Its story and photos stay safe here."));
       entries.append(empty);
       return;
     }
     if (query || yearFilter.value || tagFilter.value) {
-      empty.append(element("h3", matching.length ? "Matching trips have no photos" : "No matching trips"),
+      empty.append(emptyIcon("search"), element("h3", matching.length ? "Matching trips have no photos" : "No matching trips"),
         button("Clear filters", "secondary", clearFilters));
       entries.append(empty);
       return;
     }
-    const icon = element("span", gallery ? "▧" : "✎", "empty-icon");
-    icon.setAttribute("aria-hidden", "true");
-    empty.append(icon, element("h3", gallery ? "Your gallery is empty" : "Your story starts here"),
+    const start = button("", "primary", () => openComposer());
+    setLabel(start, "plus", gallery ? "Add a trip" : "Add your first trip");
+    empty.append(emptyIcon(gallery ? "images" : "feather"), element("h3", gallery ? "Your gallery is empty" : "Your story starts here"),
       element("p", gallery ? "Photos you add to a trip will appear here." : "Pick a trip you’d like to remember and give it a page."),
-      button(gallery ? "Add a trip" : "Add your first trip", "secondary", () => openComposer()));
+      start);
   }
   entries.append(empty);
 }
@@ -470,7 +500,7 @@ function clearFiles() {
   preview = false;
   form.querySelector("fieldset").hidden = false;
   $("#composer-preview").hidden = true;
-  $("#preview-toggle").textContent = "Preview story";
+  setLabel($("#preview-toggle"), "eye", "Preview story");
   $("#preview-toggle").setAttribute("aria-pressed", "false");
 }
 
@@ -508,7 +538,7 @@ async function openComposer(trip = null) {
   formError();
   $("#notice").hidden = true;
   $("#form-title").textContent = trip ? "Edit trip" : draft ? "Resume draft" : "New trip";
-  save.textContent = trip ? "Save changes" : "Save trip";
+  setLabel(save, "check", trip ? "Save changes" : "Save trip");
   const today = new Date();
   form.elements.title.value = trip?.title ?? "";
   form.elements.tags.value = trip?.tags?.join(",") ?? "";
@@ -661,7 +691,7 @@ function resetOnlineSearch() {
   onlineRequest++;
   onlineResults.replaceChildren();
   searchOnline.disabled = false;
-  searchOnline.textContent = "Search more places";
+  setLabel(searchOnline, "search", "Search more places");
 }
 
 function placeCredit(pin) {
@@ -721,7 +751,7 @@ searchOnline.addEventListener("click", async () => {
   } finally {
     if (current === onlineRequest) {
       searchOnline.disabled = false;
-      searchOnline.textContent = "Search more places";
+      setLabel(searchOnline, "search", "Search more places");
     }
   }
 });
@@ -740,7 +770,7 @@ form.addEventListener("invalid", () => {
   preview = false;
   form.querySelector("fieldset").hidden = false;
   $("#composer-preview").hidden = true;
-  $("#preview-toggle").textContent = "Preview story";
+  setLabel($("#preview-toggle"), "eye", "Preview story");
   $("#preview-toggle").setAttribute("aria-pressed", "false");
 }, true);
 $("#editor-toolbar").addEventListener("mousedown", event => {
@@ -792,7 +822,7 @@ $("#preview-toggle").addEventListener("click", () => {
   }
   form.querySelector("fieldset").hidden = preview;
   reading.hidden = !preview;
-  $("#preview-toggle").textContent = preview ? "Continue writing" : "Preview story";
+  setLabel($("#preview-toggle"), preview ? "pencil" : "eye", preview ? "Continue writing" : "Preview story");
   $("#preview-toggle").setAttribute("aria-pressed", String(preview));
   if (!preview) writing.editor.commands.focus();
 });
@@ -875,7 +905,7 @@ form.addEventListener("submit", async event => {
     $("#preview-toggle").disabled = false;
     form.querySelector("fieldset").disabled = false;
     save.disabled = false;
-    save.textContent = editingTrip ? "Save changes" : "Save trip";
+    setLabel(save, "check", editingTrip ? "Save changes" : "Save trip");
   }
 });
 

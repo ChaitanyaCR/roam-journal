@@ -5,6 +5,7 @@ import FileHandler from "@tiptap/extension-file-handler";
 import Placeholder from "@tiptap/extension-placeholder";
 import { closeHistory } from "@tiptap/pm/history";
 import { normalizeDocument } from "../shared/story-document.mjs";
+import { icon } from "./icons.js";
 
 // Dated sections belong at the document root and contain ordinary story blocks.
 const StoryDoc = Node.create({ name: "doc", topNode: true, content: "(block | daySection)+" });
@@ -76,7 +77,7 @@ const Photo = Image.extend({
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "photo-remove";
-      remove.textContent = "Remove photo";
+      remove.append(icon("x"), "Remove photo");
       remove.addEventListener("click", () => {
         const pos = getPos();
         if (editor.isEditable && typeof pos === "number") {

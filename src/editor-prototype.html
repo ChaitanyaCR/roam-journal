@@ -15,9 +15,9 @@
 </head>
 <body class="writing-page">
 <header class="writing-header">
-<a href="/" class="back-link">← Journal</a>
+<a href="/" class="back-link"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg>Journal</a>
 <span class="preview-badge">Editor preview</span>
-<button id="preview-toggle" type="button" class="secondary" aria-pressed="false">Preview story</button>
+<button id="preview-toggle" type="button" class="secondary" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#eye"/></svg>Preview story</button>
 </header>
 <main class="writing-main">
 <p class="preview-note">Try writing with photos. This preview is not saved to your journal; refreshing or leaving discards it.</p>
@@ -29,15 +29,15 @@
 </div>
 </div>
 <div id="editor-toolbar" class="writing-toolbar" role="group" aria-label="Story formatting">
-<button type="button" data-command="bold" aria-label="Bold" aria-pressed="false" title="Bold (Ctrl/Cmd+B)"><strong>B</strong></button>
-<button type="button" data-command="italic" aria-label="Italic" aria-pressed="false" title="Italic (Ctrl/Cmd+I)"><em>I</em></button>
-<button type="button" data-command="heading" aria-label="Heading" aria-pressed="false">H2</button>
-<button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false">• List</button>
+<button type="button" data-command="bold" aria-label="Bold" aria-pressed="false" title="Bold (Ctrl/Cmd+B)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#bold"/></svg></button>
+<button type="button" data-command="italic" aria-label="Italic" aria-pressed="false" title="Italic (Ctrl/Cmd+I)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#italic"/></svg></button>
+<button type="button" data-command="heading" aria-label="Heading" aria-pressed="false" title="Heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#heading"/></svg></button>
+<button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false" title="Bullet list"><svg class="icon" aria-hidden="true"><use href="/icons.svg#list"/></svg></button>
 <span class="toolbar-divider" aria-hidden="true"></span>
-<button type="button" id="insert-photo" class="photo-button">＋ Photo</button>
+<button type="button" id="insert-photo" class="photo-button"><svg class="icon" aria-hidden="true"><use href="/icons.svg#image-plus"/></svg>Photo</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
-<button type="button" data-command="undo" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
-<button type="button" data-command="redo" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+<button type="button" data-command="undo" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg></button>
+<button type="button" data-command="redo" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg></button>
 </div>
 <p id="editor-message" class="editor-message" role="status" hidden></p>
 <div id="writing-editor"></div>

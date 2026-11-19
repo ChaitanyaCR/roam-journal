@@ -19,8 +19,8 @@
 <body>
 <header class="header"><div class="header-inner shell">
 <a class="brand" href="/"><img src="/roam.svg" width="32" height="32" alt=""><span>Roam<em>Journal</em></span></a>
-<nav aria-label="Journal"><button data-view="stories" class="active" aria-pressed="true">Stories</button><button data-view="gallery" aria-pressed="false">Gallery</button><button data-view="timeline" aria-pressed="false">Timeline</button><button data-view="map" aria-pressed="false">World Map</button><button data-view="trash" aria-pressed="false">Trash</button></nav>
-<button class="primary header-cta" data-add><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>New trip</button>
+<nav aria-label="Journal"><button data-view="stories" class="active" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>Stories</button><button data-view="gallery" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#images"/></svg>Gallery</button><button data-view="timeline" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg>Timeline</button><button data-view="map" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#globe"/></svg>World Map</button><button data-view="trash" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#archive"/></svg>Archived</button></nav>
+<button class="primary header-cta" data-add><svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>New trip</button>
 </div></header>
 <main class="shell">
 <section class="hero" aria-labelledby="welcome"><div class="hero-copy">
@@ -28,14 +28,14 @@
 <h1 id="welcome">The places<br>I’ve <em>been.</em></h1>
 <p class="hero-lede">A travel journal for the stories, photos, and little moments worth keeping.</p>
 <div class="hero-actions">
-<button class="primary hero-button" data-add><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>Add a trip</button>
+<button class="primary hero-button" data-add><svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>Add a trip</button>
 <a class="primary hero-button" id="signin" href="/signin-with-chatgpt?return_to=%2F" target="_top" hidden>Sign in</a>
 </div>
 </div></section>
 <section id="journal" class="journal" aria-labelledby="journal-title">
 <div class="section-heading">
 <div class="heading-title"><h2 id="journal-title">Trip stories</h2><span id="count"></span></div>
-<button type="button" id="export-journal" class="secondary" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Export all active trips (.zip)</button>
+<button type="button" id="export-journal" class="secondary" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>Export all active trips (.zip)</button>
 </div>
 <p id="export-status" role="status"></p>
 <div id="trip-filters" role="group" aria-label="Filter trips" hidden>
@@ -51,7 +51,7 @@
 <dialog id="composer" class="writing-composer" aria-labelledby="form-title"><div class="modal-content">
 <header class="composer-head">
 <div><p class="eyebrow composer-eyebrow">Roam Journal</p><h2 id="form-title">New trip</h2></div>
-<button type="button" class="close" aria-label="Close" data-close>×</button>
+<button type="button" class="close" aria-label="Close" data-close><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
 </header>
 
 <form id="trip-form"><fieldset>
@@ -59,7 +59,7 @@
 <label class="title-field">Title<input name="title" required maxlength="100" placeholder="A weekend in the mountains"></label>
 <label>Destination<input name="destination" required maxlength="100" placeholder="City or region"></label>
 <div class="place-search-row"><label>Map place (optional)<input name="map_city" list="map-cities" maxlength="500" autocomplete="off" placeholder="City, town or beach"></label>
-<button type="button" class="secondary" id="search-online">Search more places</button></div>
+<button type="button" class="secondary" id="search-online"><svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>Search more places</button></div>
 <datalist id="map-cities"></datalist>
 <input name="online_place" type="hidden">
 <div id="online-results" aria-live="polite"></div><p id="city-hint" role="status" hidden></p>
@@ -70,16 +70,16 @@
 <section class="story-editor" aria-labelledby="editor-title">
 <h3 id="editor-title">Your story</h3>
 <div id="editor-toolbar" class="writing-toolbar" role="group" aria-label="Story formatting">
-<button type="button" data-command="bold" aria-label="Bold" aria-pressed="false"><strong>B</strong></button>
-<button type="button" data-command="italic" aria-label="Italic" aria-pressed="false"><em>I</em></button>
-<button type="button" data-command="heading" aria-label="Heading" aria-pressed="false">H2</button>
-<button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false">• List</button>
+<button type="button" data-command="bold" aria-label="Bold" aria-pressed="false" title="Bold"><svg class="icon" aria-hidden="true"><use href="/icons.svg#bold"/></svg></button>
+<button type="button" data-command="italic" aria-label="Italic" aria-pressed="false" title="Italic"><svg class="icon" aria-hidden="true"><use href="/icons.svg#italic"/></svg></button>
+<button type="button" data-command="heading" aria-label="Heading" aria-pressed="false" title="Heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#heading"/></svg></button>
+<button type="button" data-command="bulletList" aria-label="Bullet list" aria-pressed="false" title="Bullet list"><svg class="icon" aria-hidden="true"><use href="/icons.svg#list"/></svg></button>
 <span class="toolbar-divider" aria-hidden="true"></span>
-<button type="button" id="add-day">+ Dated section</button>
-<button type="button" id="insert-photo" class="photo-button">+ Photo</button>
+<button type="button" id="add-day"><svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar-plus"/></svg>Dated section</button>
+<button type="button" id="insert-photo" class="photo-button"><svg class="icon" aria-hidden="true"><use href="/icons.svg#image-plus"/></svg>Photo</button>
 <span class="toolbar-divider" aria-hidden="true"></span>
-<button type="button" data-command="undo" aria-label="Undo">↶</button>
-<button type="button" data-command="redo" aria-label="Redo">↷</button>
+<button type="button" data-command="undo" aria-label="Undo" title="Undo"><svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg></button>
+<button type="button" data-command="redo" aria-label="Redo" title="Redo"><svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg></button>
 </div>
 <div id="writing-editor"></div>
 <div class="writing-bottom"><span id="draft-count" role="status"></span><span>Drop or paste photos into your story.</span></div>
@@ -92,19 +92,19 @@
 <div class="actions">
 <span id="draft-status" role="status"></span>
 <button class="text-button" id="discard-draft" type="button" hidden>Discard draft</button>
-<button class="secondary" type="button" data-close>Close</button><button id="preview-toggle" class="secondary" type="button" aria-pressed="false">Preview story</button><button id="save" class="primary">Save trip</button></div>
+<button class="secondary" type="button" data-close>Close</button><button id="preview-toggle" class="secondary" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="/icons.svg#eye"/></svg>Preview story</button><button id="save" class="primary"><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>Save trip</button></div>
 </form></div></dialog>
 <dialog id="detail" class="wide" aria-label="Trip details"><div class="modal-content">
-<button type="button" class="close" aria-label="Close" data-close>×</button><div id="detail-content"></div>
+<button type="button" class="close" aria-label="Close" data-close><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button><div id="detail-content"></div>
 </div></dialog>
 <dialog id="photo-viewer" aria-labelledby="photo-viewer-title">
-<header><h2 id="photo-viewer-title"></h2><button type="button" data-photo-close aria-label="Close photo viewer">×</button></header>
+<header><h2 id="photo-viewer-title"></h2><button type="button" data-photo-close aria-label="Close photo viewer"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button></header>
 <figure class="photo-stage"><img draggable="false" alt=""><figcaption></figcaption></figure>
 <footer>
-<button type="button" data-photo-step="-1" aria-label="Previous photo">←</button>
+<button type="button" data-photo-step="-1" aria-label="Previous photo"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg></button>
 <span id="photo-position" role="status"></span>
-<button type="button" data-photo-step="1" aria-label="Next photo">→</button>
-<button type="button" data-photo-story>Read story</button>
+<button type="button" data-photo-step="1" aria-label="Next photo"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg></button>
+<button type="button" data-photo-story><svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>Read story</button>
 </footer>
 </dialog>
 </body></html>

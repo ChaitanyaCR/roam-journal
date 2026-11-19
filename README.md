@@ -14,9 +14,9 @@ Stories, Gallery, Timeline and World Map share the same search, year and tag fil
 
 Choose a suggestion in **Map place (optional)** when writing or editing a trip. In **World Map**, select a pin or choose a location from the list to open its stories. Clear the map city field to remove the pin. Typing searches the local catalog. Choose **Search more places** to search Geoapify for the map place (or the written destination if the map field is empty), then select a result to save its coordinates and attribution with the trip. Saved online pins can be reopened without another lookup. Indian place search includes GeoNames towns, alternate spellings, and Palolem Beach. [Catalog sources and attribution](scripts/data/README.md)
 
-Choose **Export all active trips (.zip)** to download your saved stories, original photos and a versioned JSON manifest. The export includes trips hidden by the current filters and excludes Trash and browser drafts. Extract the ZIP and open its top-level `index.html` to read offline.
+Choose **Export all active trips (.zip)** to download your saved stories, original photos and a versioned JSON manifest. The export includes trips hidden by the current filters and excludes archived trips and browser drafts. Extract the ZIP and open its top-level `index.html` to read offline.
 
-Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline, World Map and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
+Open a saved trip and choose **Archive** to hide it from Stories, Gallery, Timeline, World Map and search. Archived trips keep their story and photos indefinitely. To bring one back, open it in **Archived** and choose **Unarchive**.
 
 See the [phase specifications](specification/README.md) for the roadmap, implementation status, and acceptance checks for each phase.
 
@@ -38,7 +38,7 @@ After editing `src/` or `worker/`, run `npm run build` in a second terminal, the
 
 `wrangler.local.jsonc` and `scripts/local-worker.mjs` are for local development only. Publish through Sites using the normal build output; do not deploy the local entry point.
 
-Run `npm test` to build and check rich documents, editor interactions, draft recovery, photo navigation, save retries, older entries, input validation, user isolation, failed-upload cleanup, shared filters, Timeline grouping, and Trash and restore. The app autosaves new trips and unfinished edits, including pending photos, in the current browser. Open **New trip** or **Edit trip** again to resume. Saving the trip clears the draft. Open a photo in a story or the gallery to browse that trip’s photos by swipe, keyboard, or the on-screen arrows.
+Run `npm test` to build and check rich documents, editor interactions, draft recovery, photo navigation, save retries, older entries, input validation, user isolation, failed-upload cleanup, shared filters, Timeline grouping, and archiving and unarchiving. The app autosaves new trips and unfinished edits, including pending photos, in the current browser. Open **New trip** or **Edit trip** again to resume. Saving the trip clears the draft. Open a photo in a story or the gallery to browse that trip’s photos by swipe, keyboard, or the on-screen arrows.
 
 ## Writing editor prototype
 
