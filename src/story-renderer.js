@@ -35,53 +35,53 @@ export function layoutStoryPhotos(container) {
 }
 
 // Render structured content with DOM methods, without injecting stored HTML.
-export function renderStory(document, photos) {
-  const container = window.document.createElement("div");
+export function renderStory(story, photos, photoUrl = photo => "/api/photos/" + encodeURIComponent(photo.key), doc = window.document) {
+  const container = doc.createElement("div");
   container.className = "rich-story";
   function render(node) {
     if (node.type === "text") {
-      let text = window.document.createTextNode(node.text);
+      let text = doc.createTextNode(node.text);
       for (const mark of node.marks ?? []) {
         const tag = mark.type === "bold" ? "strong" : mark.type === "italic" ? "em" : "span";
-        const wrapper = window.document.createElement(tag);
+        const wrapper = doc.createElement(tag);
         wrapper.append(text);
         text = wrapper;
       }
       return text;
     }
     if (node.type === "daySection") {
-      const section = window.document.createElement("section");
+      const section = doc.createElement("section");
       section.className = "story-day";
-      const heading = window.document.createElement("h3");
+      const heading = doc.createElement("h3");
       heading.textContent = node.attrs.date;
-      const body = window.document.createElement("div");
+      const body = doc.createElement("div");
       for (const child of node.content) body.append(render(child));
       section.append(heading, body);
       return section;
     }
     if (node.type === "image") {
-      const figure = window.document.createElement("figure");
+      const figure = doc.createElement("figure");
       const photo = photos[node.attrs.index];
       if (!photo) return figure;
       figure.dataset.photoKey = photo.key;
-      const image = window.document.createElement("img");
-      image.src = "/api/photos/" + encodeURIComponent(photo.key);
+      const image = doc.createElement("img");
+      image.setAttribute("src", photoUrl(photo, node.attrs.index));
       image.alt = node.attrs.caption || photo.alt || "Trip photo";
       image.loading = "lazy";
       figure.append(image);
       if (node.attrs.caption) {
-        const caption = window.document.createElement("figcaption");
+        const caption = doc.createElement("figcaption");
         caption.textContent = node.attrs.caption;
         figure.append(caption);
       }
       return figure;
     }
     const tags = { paragraph: "p", heading: "h3", bulletList: "ul", listItem: "li", hardBreak: "br" };
-    const element = window.document.createElement(tags[node.type] || "div");
+    const element = doc.createElement(tags[node.type] || "div");
     for (const child of node.content ?? []) element.append(render(child));
     return element;
   }
-  for (const node of document.content) container.append(render(node));
+  for (const node of story.content) container.append(render(node));
   layoutStoryPhotos(container);
   return container;
 }

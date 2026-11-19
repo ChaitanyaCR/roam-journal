@@ -14,6 +14,8 @@ Stories, Gallery, Timeline and World Map share the same search, year and tag fil
 
 Choose a suggestion in **Map place (optional)** when writing or editing a trip. In **World Map**, select a pin or choose a location from the list to open its stories. Clear the map city field to remove the pin. Typing searches the local catalog. Choose **Search more places** to search Geoapify for the map place (or the written destination if the map field is empty), then select a result to save its coordinates and attribution with the trip. Saved online pins can be reopened without another lookup. Indian place search includes GeoNames towns, alternate spellings, and Palolem Beach. [Catalog sources and attribution](scripts/data/README.md)
 
+Choose **Export all active trips (.zip)** to download your saved stories, original photos and a versioned JSON manifest. The export includes trips hidden by the current filters and excludes Trash and browser drafts. Extract the ZIP and open its top-level `index.html` to read offline.
+
 Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline, World Map and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
 
 See the [phase specifications](specification/README.md) for the roadmap, implementation status, and acceptance checks for each phase.

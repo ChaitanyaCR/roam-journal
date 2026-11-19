@@ -1,3 +1,4 @@
+import { exportJournal } from "./journal-export.js";
 import { indexPlaces, findPlaces } from "./place-search.js";
 import { createWritingEditor } from "./writing-editor.js";
 import { layoutStoryPhotos, renderStory } from "./story-renderer.js";
@@ -327,6 +328,7 @@ function clearFilters() {
 }
 
 function render() {
+  $("#export-journal").hidden = state !== "ready";
   const entries = $("#entries");
   const count = $("#count");
   const gallery = view === "gallery";
@@ -411,6 +413,20 @@ function render() {
 search.addEventListener("input", render);
 yearFilter.addEventListener("change", render);
 tagFilter.addEventListener("change", render);
+
+$("#export-journal").addEventListener("click", async event => {
+  const button = event.currentTarget;
+  const progress = message => { $("#export-status").textContent = message; };
+  button.disabled = true;
+  progress("Preparing journal ZIP…");
+  try {
+    progress(await exportJournal(progress));
+  } catch (error) {
+    progress(error.name === "AbortError" ? "Export cancelled." : error.message + " Select Export to retry.");
+  } finally {
+    button.disabled = false;
+  }
+});
 
 async function load() {
   state = "loading";

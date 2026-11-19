@@ -1,12 +1,12 @@
 # Phase 4 · Portable journal export
 
-**Status** Planned. Builds on the final trip, tag, date and location representations from Phases 2 and 3.
+**Status** Implemented locally. Chrome download and offline navigation verified. Large-library and mobile download checks remain open.
 
 ## User outcome
 
 A signed-in person can download a ZIP and read their saved journal offline. The archive contains human-readable HTML stories, captions, original photo files and machine-readable JSON. Opening the extracted stories must work without a running Worker, an internet connection or a signed-in browser.
 
-**Proposed scope** Export all active saved trips for the current account, independent of the current view or filters. Exclude Trash and browser-local drafts. Label the export action with that scope. This phase covers export only. Restoring an archive into the app would need its own specification.
+**Scope** Export all active saved trips for the current account, independent of the current view or filters. Exclude Trash and browser-local drafts. Label the export action with that scope. This phase covers export only. Restoring an archive into the app would need its own specification.
 
 ## Archive and implementation
 
@@ -22,3 +22,7 @@ A signed-in person can download a ZIP and read their saved journal offline. The 
 - Disconnect from the network, extract the ZIP and open the index. Follow every link and verify all photos, captions and day headings appear in story order. Compare an archived original with its stored bytes.
 - Parse the JSON and resolve every referenced file inside the archive. Verify another user’s data, trashed trips and pending draft photos are absent under the proposed scope.
 - Exercise an empty journal, a large photo collection and an interrupted download. Retrying should leave the saved journal untouched.
+
+## Download behavior
+
+The browser reads one original at a time through the authenticated photo endpoint. Browsers with a permitted file picker stream the ZIP to the selected file. The download fallback builds a browser-managed Blob, so the maximum archive size depends on the browser.
