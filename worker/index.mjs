@@ -1,3 +1,4 @@
+import { searchPlaces, verifyPlace } from "./online-places.mjs";
 import { normalizeDocument, documentText, validDate } from "../shared/story-document.mjs";
 
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
@@ -75,7 +76,7 @@ function resolveCity(label) {
   return cityCatalog.get(label.toLowerCase());
 }
 
-async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = null) {
+async function saveTrip(request, { DB: db, BUCKET: bucket, GEOAPIFY_API_KEY: geoKey }, owner, tripId = null) {
   if (Number(request.headers.get("content-length")) > 29 * MB) {
     return error("Keep the combined photo size under 28 MB.", 413);
   }
@@ -135,6 +136,10 @@ async function saveTrip(request, { DB: db, BUCKET: bucket }, owner, tripId = nul
         retained.some(key => !allowed.has(key))) {
       return error("The story contains an invalid photo.", 400);
     }
+  }
+  if (field("online_place")) {
+    pin = await verifyPlace(field("online_place"), geoKey, owner, cityLabel);
+    if (!pin) return error("Select the place again using Search more places.", 400);
   }
   if (cityLabel && !pin) return error("Choose a city from the map suggestions or clear the map city field.", 400);
   let blocks;
@@ -276,6 +281,10 @@ export default {
     const origin = request.headers.get("origin");
     if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) return error("Invalid request origin.", 403);
     try {
+      if (path === "/api/places/search" && request.method === "POST") {
+        const result = await searchPlaces(request, env.GEOAPIFY_API_KEY, owner);
+        return result.message ? error(result.message, result.status) : json(result.places);
+      }
       const action = path.match(/^\/api\/trips\/([^/]+)\/(trash|restore)$/);
       if (action && request.method === "POST") {
         if (!uuid.test(action[1])) return error("Trip not found.", 404);

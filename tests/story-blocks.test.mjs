@@ -377,3 +377,38 @@ test("Indian place suggestions resolve to distinct saved pins using common spell
     assert.equal(saved.city_pin.label, label);
   }
 });
+
+test("explicit Geoapify lookup signs a selectable place for its owner and saves it offline", async t => {
+  const env = storage();
+  const lookup = owner => worker.fetch(request("POST", JSON.stringify({ query: "Island pier" }), owner, "/api/places/search"), env);
+  assert.equal((await lookup(null)).status, 401);
+  assert.equal((await lookup("alice")).status, 503);
+  env.GEOAPIFY_API_KEY = "test-only";
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    calls++;
+    assert.equal(url.hostname, "api.geoapify.com");
+    assert.equal(url.searchParams.get("text"), "Island pier");
+    return Response.json({ results: [{ formatted: "Island pier, Goa, India", lat: 15, lon: 74, place_id: "pier",
+      datasource: { attribution: "© OpenStreetMap contributors", url: "https://www.openstreetmap.org/copyright", license: "ODbL" } }] });
+  });
+  const response = await lookup("alice");
+  assert.equal(response.status, 200);
+  const [selection] = await response.json();
+  assert.equal(selection.pin.provider, "geoapify");
+  assert.equal(selection.pin.license, "ODbL");
+  const data = form();
+  data.set("story", "The ferry arrived.");
+  data.set("map_city", selection.pin.label);
+  data.set("online_place", JSON.stringify(selection));
+  assert.equal((await worker.fetch(request("POST", data, "bob"), env)).status, 400);
+  data.set("online_place", JSON.stringify({ ...selection, pin: { ...selection.pin, lat: 0 } }));
+  assert.equal((await worker.fetch(request("POST", data), env)).status, 400);
+  data.set("online_place", JSON.stringify(selection));
+  const saved = await worker.fetch(request("POST", data), env);
+  assert.equal(saved.status, 201);
+  assert.deepEqual((await saved.json()).city_pin, selection.pin);
+  delete env.GEOAPIFY_API_KEY;
+  assert.deepEqual((await (await worker.fetch(request("GET"), env)).json())[0].city_pin, selection.pin);
+  assert.equal(calls, 1);
+});

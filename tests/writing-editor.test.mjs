@@ -249,16 +249,24 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   window.HTMLElement.prototype.scrollIntoView = () => {};
   let failed = false;
   let saved;
+  const online = { pin: { label: "Island pier, Goa, India", lat: 15, lng: 74, id: "pier", provider: "geoapify",
+    attribution: "OpenStreetMap" }, proof: "fixture" };
+  let lookups = 0;
   const submittedIds = [];
   const editIds = [];
   globalThis.fetch = async (url, options) => {
+    if (url === "/api/places/search") {
+      lookups++;
+      assert.deepEqual(JSON.parse(options.body), { query: "Island pier" });
+      return Response.json([online]);
+    }
     if (url === "/map-cities.json") return Response.json([["Tokyo, Japan", 35.7, 139.7]]);
     if (options?.method === "POST") {
       submittedIds.push(options.body.get("id"));
       if (!failed) { failed = true; return Response.json({ message: "Temporary save failure" }, { status: 503 }); }
       saved = {
         id: options.body.get("id"), title: options.body.get("title"), destination: options.body.get("destination"),
-        city_pin: { label: options.body.get("map_city"), lat: 35.7, lng: 139.7 },
+        city_pin: JSON.parse(options.body.get("online_place")).pin,
         end_date: options.body.get("end_date"), tags: options.body.get("tags").split(","), date: options.body.get("date"), story: "A memory", photos: [], blocks: [], revision: null,
         document: JSON.parse(options.body.get("document")),
       };
@@ -289,7 +297,14 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   form.elements.map_city.value = "Tok";
   form.elements.map_city.dispatchEvent(new window.Event("input", { bubbles: true }));
   await waitFor(() => document.querySelector("#map-cities option"));
-  form.elements.map_city.value = document.querySelector("#map-cities option").value;
+  form.elements.destination.value = "Island pier";
+  form.elements.map_city.value = "";
+  form.elements.map_city.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(lookups, 0);
+  document.querySelector("#search-online").click();
+  await waitFor(() => document.querySelector("#online-results button"));
+  document.querySelector("#online-results button").click();
+  assert.equal(lookups, 1);
   form.elements.namedItem("tags").value = "Coast,hiking";
   form.elements.namedItem("title").value = "My memory";
   form.elements.namedItem("destination").value = "Goa";
@@ -309,14 +324,15 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(draft.fields.end_date, "2027-01-01");
   assert.equal(draft.document.version, 2);
   assert.equal(draft.document.content.find(node => node.type === "daySection").content.some(node => node.type === "image"), true);
-  assert.equal(draft.fields.map_city, "Tokyo, Japan");
+  assert.equal(draft.fields.map_city, online.pin.label);
+  assert.deepEqual(JSON.parse(draft.fields.online_place), online);
   assert.equal(draft.fields.tags, "Coast,hiking");
   assert.equal(draft.fields.title, "My memory");
   assert.equal(draft.uploads[0].name, "beach.png");
   document.querySelector("[data-add]").click();
   await waitFor(() => document.querySelector("#composer").open);
   assert.equal(document.querySelector("#form-title").textContent, "Resume draft");
-  assert.equal(form.elements.map_city.value, "Tokyo, Japan");
+  assert.equal(form.elements.map_city.value, online.pin.label);
   assert.equal(form.elements.namedItem("tags").value, "Coast,hiking");
   assert.match(document.querySelector("#writing-editor figure img").getAttribute("src"), /^blob:/);
   assert.equal(document.querySelector("#writing-editor .story-day input").value, "2027-01-01");
@@ -336,6 +352,10 @@ test("the main trip form keeps failed drafts and can reopen and edit a saved tri
   assert.equal(document.querySelector("#composer").open, false);
   assert.equal(document.querySelector("#notice").textContent, "Trip saved.");
   assert.equal(await readDraft("account-one:new"), undefined);
+  document.querySelector('[data-view="map"]').click();
+  assert.equal(document.querySelector(".map-panel select").value, "geoapify:pier");
+  assert.match(document.querySelector(".map-panel .place-credit").textContent, /OpenStreetMap/);
+  document.querySelector('[data-view="stories"]').click();
   document.querySelector(".cards .card").click();
   assert.equal(document.querySelector("#detail-content .rich-story strong").textContent, "memory");
 

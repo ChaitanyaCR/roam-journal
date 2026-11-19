@@ -12,7 +12,7 @@ For a multi-day trip, enter a start and end date. Choose **＋ Dated section** t
 
 Stories, Gallery, Timeline and World Map share the same search, year and tag filters. Search matches titles, destinations, story text and photo captions. Add comma-separated tags in the trip editor. Timeline shows trips newest first, with stories from the same date stacked under one milestone.
 
-Choose a suggestion in **Map place (optional)** when writing or editing a trip. In **World Map**, select a pin or choose a location from the list to open its stories. Clear the map city field to remove the pin. Place suggestions and the map are served locally by the journal. Indian place search includes GeoNames towns, alternate spellings, and Palolem Beach. [Catalog sources and attribution](scripts/data/README.md)
+Choose a suggestion in **Map place (optional)** when writing or editing a trip. In **World Map**, select a pin or choose a location from the list to open its stories. Clear the map city field to remove the pin. Typing searches the local catalog. Choose **Search more places** to search Geoapify for the map place (or the written destination if the map field is empty), then select a result to save its coordinates and attribution with the trip. Saved online pins can be reopened without another lookup. Indian place search includes GeoNames towns, alternate spellings, and Palolem Beach. [Catalog sources and attribution](scripts/data/README.md)
 
 Open a saved trip and choose **Move to Trash** to hide it from Stories, Gallery, Timeline, World Map and search. To recover it with its photos, open the trip in **Trash** and choose **Restore trip**.
 
@@ -27,6 +27,8 @@ npm install
 npm run db:local
 npm run dev
 ```
+
+To enable **Search more places**, put `GEOAPIFY_API_KEY=your-key` in the project-root `.dev.vars` file and restart Wrangler. For hosted use, configure the same name as a Worker secret. The local picker works without a key.
 
 Open http://127.0.0.1:8787. The local entry point uses the test identity `local-user` instead of Sites sign-in. The server binds to loopback, and local D1/R2 data is stored in the ignored `.wrangler/` directory, separately from hosted data.
 

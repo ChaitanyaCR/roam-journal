@@ -34,7 +34,7 @@ let draftWrites = Promise.resolve();
 const search = $("#trip-search");
 const yearFilter = $("#trip-year");
 const tagFilter = $("#trip-tag");
-const draftFields = ["title", "destination", "map_city", "date", "end_date", "tags"];
+const draftFields = ["title", "destination", "map_city", "online_place", "date", "end_date", "tags"];
 const dateLabel = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
 
 const monthLabel = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" });
@@ -258,9 +258,10 @@ let selectedCity = "";
 function worldMap(pinned) {
   const groups = new Map();
   for (const trip of pinned) {
-    const label = trip.city_pin.label;
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(trip);
+    const pin = trip.city_pin;
+    const key = pin.provider ? pin.provider + ":" + pin.id : pin.label;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(trip);
   }
   const root = element("div", "", "world-map");
   const chart = element("div", "", "map-chart");
@@ -290,10 +291,10 @@ function worldMap(pinned) {
       return item;
     }));
   }
-  for (const city of [...groups.keys()].sort((a, b) => a.localeCompare(b))) {
+  for (const city of [...groups.keys()].sort((a, b) => groups.get(a)[0].city_pin.label.localeCompare(groups.get(b)[0].city_pin.label))) {
     const trips = groups.get(city);
     const { lat, lng } = trips[0].city_pin;
-    const caption = city + " · " + trips.length + (trips.length === 1 ? " trip" : " trips");
+    const caption = trips[0].city_pin.label + " · " + trips.length + (trips.length === 1 ? " trip" : " trips");
     const option = element("option", caption);
     option.value = city;
     picker.append(option);
@@ -304,6 +305,13 @@ function worldMap(pinned) {
     marker.style.top = ((90 - lat) / 180 * 100) + "%";
     chart.append(marker);
     markers.set(city, marker);
+  }
+  const onlinePins = pinned.map(trip => trip.city_pin).filter(pin => pin.provider === "geoapify");
+  const credited = new Set();
+  for (const pin of onlinePins) {
+    const source = pin.attribution + pin.sourceUrl;
+    if (!credited.has(source)) panel.append(placeCredit(pin));
+    credited.add(source);
   }
   picker.addEventListener("change", () => selectCity(picker.value));
   selectCity(groups.has(selectedCity) ? selectedCity : picker.options[0].value);
@@ -473,6 +481,7 @@ async function openComposer(trip = null) {
     catch { storageError = true; }
     finally { openingComposer = false; }
   }
+  resetOnlineSearch();
   form.reset();
   clearFiles();
   draftKey = key;
@@ -616,12 +625,12 @@ async function suggestCities() {
       if (alias) option.label = alias + " — " + label;
       return option;
     }));
-    if (!matches.length) {
+    if (!matches.length && !form.elements.online_place.value && editingTrip?.city_pin?.label !== cityInput.value) {
       const maps = element("a", "Search Google Maps ↗");
       maps.href = "https://www.google.com/maps/search/?" + new URLSearchParams({ api: "1", query: cityInput.value.trim() });
       maps.target = "_blank";
       maps.rel = "noopener noreferrer";
-      hint.replaceChildren("No matching place. Try another spelling or clear the field to save without a pin. ", maps);
+      hint.replaceChildren("No local match. Use Search more places or try another spelling. ", maps);
       hint.hidden = false;
     }
   } catch {
@@ -629,7 +638,83 @@ async function suggestCities() {
     hint.hidden = false;
   }
 }
-cityInput.addEventListener("input", suggestCities);
+const onlineResults = $("#online-results");
+const searchOnline = $("#search-online");
+let onlineRequest = 0;
+function resetOnlineSearch() {
+  onlineRequest++;
+  onlineResults.replaceChildren();
+  searchOnline.disabled = false;
+  searchOnline.textContent = "Search more places";
+}
+
+function placeCredit(pin) {
+  const credit = element("small", "Powered by ", "place-credit");
+  const link = element("a", "Geoapify");
+  link.href = "https://www.geoapify.com/";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  credit.append(link);
+  if (pin.attribution && pin.attribution !== "Geoapify") {
+    const source = element(pin.sourceUrl ? "a" : "span", pin.attribution);
+    if (pin.sourceUrl) {
+      source.href = pin.sourceUrl;
+      source.target = "_blank";
+      source.rel = "noopener noreferrer";
+    }
+    credit.append(" · ", source);
+  }
+  return credit;
+}
+
+searchOnline.addEventListener("click", async () => {
+  const query = cityInput.value.trim() || form.elements.destination.value.trim();
+  resetOnlineSearch();
+  if (query.length < 2 || query.length > 200) {
+    onlineResults.textContent = "Enter a destination or map place (2–200 characters), then search.";
+    cityInput.focus();
+    return;
+  }
+  const current = onlineRequest;
+  searchOnline.disabled = true;
+  searchOnline.textContent = "Searching…";
+  onlineResults.textContent = "Searching for “" + query + "”…";
+  try {
+    const response = await fetch("/api/places/search", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }),
+    });
+    const results = await response.json();
+    if (current !== onlineRequest || !composer.open) return;
+    if (!response.ok) throw new Error(results.message);
+    onlineResults.replaceChildren();
+    onlineResults.textContent = results.length ? "Choose a place to pin:" : "No online matches. Try adding the region or country.";
+    for (const selection of results) {
+      const choose = button(selection.pin.label, "secondary", () => {
+        cityInput.value = selection.pin.label;
+        form.elements.online_place.value = JSON.stringify(selection);
+        resetOnlineSearch();
+        onlineResults.append(placeCredit(selection.pin));
+        $("#city-hint").hidden = true;
+        cityInput.focus();
+        markDirty();
+      });
+      onlineResults.append(choose, placeCredit(selection.pin));
+    }
+  } catch (failure) {
+    if (current === onlineRequest) onlineResults.textContent = failure.message || "Search failed. Try again.";
+  } finally {
+    if (current === onlineRequest) {
+      searchOnline.disabled = false;
+      searchOnline.textContent = "Search more places";
+    }
+  }
+});
+
+cityInput.addEventListener("input", () => {
+  resetOnlineSearch();
+  form.elements.online_place.value = "";
+  void suggestCities();
+});
 cityInput.addEventListener("focus", suggestCities);
 form.elements.date.addEventListener("input", () => { form.elements.end_date.min = form.elements.date.value; });
 form.addEventListener("input", markDirty);

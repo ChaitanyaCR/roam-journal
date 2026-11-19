@@ -267,3 +267,11 @@ dialog.writing-composer{width:100%;max-width:none;height:100dvh;max-height:100dv
 .world-map+.empty{margin-top:1rem}
 @media(max-width:850px){.header-inner nav{margin-right:0}.world-map{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:640px){.header-inner{flex-wrap:wrap;padding-block:10px}.header-inner nav{order:1;width:100%;flex-wrap:wrap}}
+#online-results{display:grid;gap:.35rem;justify-items:start}
+#online-results:empty{display:none}
+#online-results button{white-space:normal;text-align:left}
+.place-credit{display:block;color:var(--muted);font-size:.8rem}
+.place-credit a{text-decoration:underline}
+
+.place-search-row{display:flex;flex-wrap:wrap;align-items:end;gap:.5rem}
+.place-search-row label{flex:1 1 14rem;min-width:0}

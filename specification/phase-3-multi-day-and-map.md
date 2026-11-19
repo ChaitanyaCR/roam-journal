@@ -18,6 +18,8 @@ The build creates an equirectangular map from world-atlas and a searchable catal
 
 The map uses the active, filtered trip list. The location selector provides keyboard access to the same city groups as the pins, including cities that overlap on small screens. Selecting a location lists its matching stories in date order.
 
+An explicit **Search more places** action sends the typed place name through the authenticated Worker to Geoapify. Selecting a result retains its coordinates, provider ID and data-source attribution in the draft and saved trip. World Map groups these trips by provider ID and displays attribution.
+
 ## Acceptance checks
 
 - Open and edit an older single-day trip. Adding dates and a second day preserves its original content. Resume a draft with dated sections and photos, save, then reopen it.
