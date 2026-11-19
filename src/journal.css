@@ -25,6 +25,10 @@
   --shadow-md:0 2px 6px -2px rgba(18,19,22,.08),0 18px 40px -18px rgba(18,19,22,.28);
   --shadow-lg:0 40px 100px -30px rgba(18,19,22,.45);
   --radius-lg:28px;
+  /* Story window and the edit form that replaces it share one frame. */
+  --sheet-w:min(calc(100vw - 48px),1200px);
+  --sheet-h:calc(100dvh - 48px);
+  --read-w:820px;
   --radius:20px;
   --radius-sm:12px;
   --serif:"Fraunces",ui-serif,Georgia,serif;
@@ -217,7 +221,7 @@ dialog::backdrop{background:rgba(8,9,11,.5);-webkit-backdrop-filter:blur(8px);ba
 dialog[open]::backdrop{animation:fade-in .3s ease}
 @keyframes dialog-in{from{opacity:0;transform:translateY(16px) scale(.985)}}
 @keyframes fade-in{from{opacity:0}}
-dialog.wide{width:min(100% - 24px,880px)}
+dialog.wide{width:var(--sheet-w);height:var(--sheet-h);max-height:none}
 .modal-content{position:relative;padding:clamp(24px,5vw,56px)}
 .modal-content h2{font-size:clamp(40px,6.4vw,68px);font-weight:400;letter-spacing:-.04em;line-height:.98;margin-bottom:18px;padding-right:44px;overflow-wrap:anywhere}
 .close{position:absolute;right:16px;top:16px;z-index:5;width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--ink-2);transition:background-color .2s,transform .2s var(--ease)}
@@ -253,6 +257,10 @@ figcaption{color:var(--muted);font-size:13.5px;margin:10px 0 0;text-align:center
 .rich-story ul{padding-left:24px;margin:0 0 20px}
 .rich-story li::marker{color:var(--accent)}
 .rich-story>p:first-child::first-letter{float:left;font-size:4.1em;line-height:.82;padding:6px 10px 0 0;font-weight:400;color:var(--ink)}
+/* Story window: text in a readable centred column, photos use the full width. */
+#detail-content>*:not(.story-content){max-width:var(--read-w);margin-left:auto;margin-right:auto}
+#detail-content>.location{display:flex}
+.story-content :is(.story-text,.rich-story p,.rich-story h3,.rich-story ul),.story-content>figure:not([data-photo-key]){max-width:var(--read-w);margin-left:auto;margin-right:auto}
 .story-photo-open{display:block;max-inline-size:100%;margin-inline:auto;padding:0;border:0;border-radius:16px;background:transparent;cursor:zoom-in;overflow:hidden}
 .story-photo-open>img{display:block;max-inline-size:100%;max-block-size:72dvh;border-radius:inherit;transition:transform .6s var(--ease)}
 .story-photo-open:hover>img{transform:scale(1.02)}
@@ -260,7 +268,7 @@ figcaption{color:var(--muted);font-size:13.5px;margin:10px 0 0;text-align:center
 
 /* Dated sections (reading and editing) */
 .story-day{margin-block:2rem;padding-top:0}
-.story-day>h3,.rich-story .story-day>h3{display:flex;align-items:center;gap:14px;margin:0 0 18px;font:500 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink)}
+.story-day>h3,.rich-story .story-day>h3{display:flex;align-items:center;gap:14px;margin:0 auto 18px;font:500 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink)}
 .story-day>h3::after{content:"";flex:1;height:1px;background:var(--line-strong)}
 .story-day>label{max-width:15rem;margin-bottom:14px}
 
@@ -269,6 +277,15 @@ figcaption{color:var(--muted);font-size:13.5px;margin:10px 0 0;text-align:center
 dialog.writing-composer{--pad:clamp(18px,2.4vw,32px);--head-h:76px;width:min(calc(100% - 24px),780px);max-width:none;height:calc(100dvh - 24px);max-height:none;margin:12px 12px 12px auto;border:1px solid var(--line-strong);border-radius:24px;background:var(--panel-bg);-webkit-backdrop-filter:saturate(1.8) blur(28px);backdrop-filter:saturate(1.8) blur(28px);box-shadow:var(--shadow-lg);overscroll-behavior:contain}
 dialog.writing-composer[open]{animation:panel-in .45s var(--ease)}
 @keyframes panel-in{from{opacity:0;transform:translateX(48px)}}
+/* Edit: the form takes over the story window's frame. */
+dialog.writing-composer.as-sheet{--pad:clamp(20px,4vw,56px);width:var(--sheet-w);height:var(--sheet-h);margin:auto;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+dialog.writing-composer.as-sheet[open]{animation:fade-in .2s ease}
+dialog.writing-composer.as-sheet::backdrop{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+.as-sheet .trip-fields{grid-template-columns:1fr 1fr;column-gap:20px}
+.as-sheet .trip-fields>:is(.title-field,#online-results,#city-hint){grid-column:1/-1}
+.as-sheet .writing-editor :is(p,h2,ul),.as-sheet .reading-preview :is(p,h1,h2,ul,.preview-meta){max-width:var(--read-w);margin-left:auto;margin-right:auto}
+.as-sheet .writing-editor .story-day>label{margin-left:max(0px,calc((100% - var(--read-w)) / 2))}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.32s;animation-timing-function:ease}
 .writing-composer>.modal-content{min-height:100%;padding:0 var(--pad);display:flex;flex-direction:column}
 .composer-head{position:sticky;top:0;z-index:7;display:flex;align-items:center;justify-content:space-between;gap:16px;height:var(--head-h);margin:0 calc(-1 * var(--pad)) 20px;padding:0 var(--pad);background:var(--header-bg);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-bottom:1px solid var(--line)}
 .composer-head>div{min-width:0}
@@ -409,6 +426,8 @@ dialog.writing-composer[open]{animation:panel-in .45s var(--ease)}
   .rich-story,.story-text{font-size:18px}
   .writing-composer .actions>.secondary,.writing-composer .actions>.primary{flex:1 1 auto}
   dialog.writing-composer{--head-h:68px;width:100%;height:100dvh;margin:0;border:0;border-radius:0}
+  :root{--sheet-w:calc(100vw - 16px);--sheet-h:calc(100dvh - 16px)}
+  .as-sheet .trip-fields{grid-template-columns:1fr}
   .writing-composer .composer-head h2{font-size:24px}
 }
 @media(max-width:520px){

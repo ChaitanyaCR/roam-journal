@@ -516,6 +516,18 @@ function updateToolbar(editor) {
   }
 }
 
+// Editing from an open story swaps that window for the form in place;
+// a View Transition cross-fades the two where the browser supports it.
+function swapSheet(update) {
+  const animate = composer.classList.contains("as-sheet") && typeof document.startViewTransition === "function"
+    && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!animate) {
+    update();
+    return Promise.resolve();
+  }
+  return document.startViewTransition(update).updateCallbackDone;
+}
+
 async function openComposer(trip = null) {
   if (busy || openingComposer || composer.open || state === "loading") return;
   const key = draftScope && typeof indexedDB !== "undefined" ? `${draftScope}:${trip?.id ?? "new"}` : undefined;
@@ -560,10 +572,19 @@ async function openComposer(trip = null) {
   if (draft && trip && (baseRevision ?? null) !== (trip.revision ?? null) && requestId !== trip.revision) {
     formError("This trip has changed since this draft was saved. You can review or copy your draft here. Discard the draft to edit the latest version.");
   }
-  composer.showModal();
-  writing = createWritingEditor({ element: $("#writing-editor"), trip, draft, onChange: updateToolbar, onError: formError });
-  writing.editor.on("update", markDirty);
-  updateToolbar(writing.editor);
+  composer.classList.toggle("as-sheet", Boolean(trip) && detail.open);
+  openingComposer = true;
+  try {
+    await swapSheet(() => {
+      composer.showModal();
+      composer.scrollTop = 0;
+      writing = createWritingEditor({ element: $("#writing-editor"), trip, draft, onChange: updateToolbar, onError: formError });
+      writing.editor.on("update", markDirty);
+      updateToolbar(writing.editor);
+    });
+  } finally {
+    openingComposer = false;
+  }
   form.elements.title.focus();
 }
 
@@ -609,9 +630,11 @@ async function closeComposer() {
     if (!window.confirm("Close without saving your latest changes?")) return;
   }
   if (busy || stamp !== draftStamp || !composer.open) return;
-  composer.close();
-  clearFiles();
-  editingTrip = null;
+  await swapSheet(() => {
+    composer.close();
+    clearFiles();
+    editingTrip = null;
+  });
 }
 
 function markDirty() {
@@ -635,10 +658,12 @@ discard.addEventListener("click", async () => {
   try {
     if (persistedStamp) await clearDraft(draftKey, persistedStamp);
     if (stamp !== draftStamp || busy || !composer.open) return;
-    composer.close();
-    clearFiles();
-    editingTrip = null;
-    if (trip) showDetail(trip);
+    await swapSheet(() => {
+      composer.close();
+      clearFiles();
+      editingTrip = null;
+      if (trip) showDetail(trip);
+    });
   } catch {
     formError("The draft could not be discarded. Try again.");
   }
@@ -879,16 +904,21 @@ form.addEventListener("submit", async event => {
       catch { draftCleanupFailed = true; }
     }
     dirty = false;
-    composer.close();
-    clearFiles();
-    editingTrip = null;
     if (trip) {
-      setTrips(trips.map(item => item.id === result.id ? result : item));
-      render();
-      showDetail(result, draftCleanupFailed ? "Trip updated. The browser could not clear its draft." : "Trip updated.");
+      await swapSheet(() => {
+        composer.close();
+        clearFiles();
+        editingTrip = null;
+        setTrips(trips.map(item => item.id === result.id ? result : item));
+        render();
+        showDetail(result, draftCleanupFailed ? "Trip updated. The browser could not clear its draft." : "Trip updated.");
+      });
       detail.querySelector("[data-close]").focus();
       return;
     }
+    composer.close();
+    clearFiles();
+    editingTrip = null;
     await load();
     if (state !== "ready") {
       setTrips([result, ...trips.filter(item => item.id !== result.id)]);
