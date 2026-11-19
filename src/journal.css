@@ -268,7 +268,6 @@ figcaption{color:var(--muted);font-size:13.5px;margin:10px 0 0;text-align:center
 /* Translucent side panel that slides in from the right; full screen on phones. */
 dialog.writing-composer{--pad:clamp(18px,2.4vw,32px);--head-h:76px;width:min(calc(100% - 24px),780px);max-width:none;height:calc(100dvh - 24px);max-height:none;margin:12px 12px 12px auto;border:1px solid var(--line-strong);border-radius:24px;background:var(--panel-bg);-webkit-backdrop-filter:saturate(1.8) blur(28px);backdrop-filter:saturate(1.8) blur(28px);box-shadow:var(--shadow-lg);overscroll-behavior:contain}
 dialog.writing-composer[open]{animation:panel-in .45s var(--ease)}
-dialog.writing-composer::backdrop{background:rgba(8,9,11,.22);-webkit-backdrop-filter:none;backdrop-filter:none}
 @keyframes panel-in{from{opacity:0;transform:translateX(48px)}}
 .writing-composer>.modal-content{min-height:100%;padding:0 var(--pad);display:flex;flex-direction:column}
 .composer-head{position:sticky;top:0;z-index:7;display:flex;align-items:center;justify-content:space-between;gap:16px;height:var(--head-h);margin:0 calc(-1 * var(--pad)) 20px;padding:0 var(--pad);background:var(--header-bg);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-bottom:1px solid var(--line)}
